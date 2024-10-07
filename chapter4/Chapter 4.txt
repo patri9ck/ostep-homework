@@ -1,0 +1,55 @@
+4.0 The Abstraction: The Process
+- A process is a running programm
+- Virtualization: The OS provides the illusion, there would be a nearly-endless supply CPUs
+- Time sharing: Running one process, stopping it, running another, ... (vs. space sharing: A resource is divided among those who need to use it, e.g. disk space)
+- Cost of time sharing: Performance
+- Mechanisms: Low-level methods that implement functionality
+- Context switch: A time-sharing mechanism, the ability of the OS to stop running one program and start running another
+- Policies: Algorithms for making decisions withing the OS (e.g. a scheduling policy: Which program should the OS run)
+4.1 The Abstraction: A Process
+- Process consists of address space, registers (program counter/PC, stack pointer, frame pointer), I/O information (e.g. list of the files the process currently accesses)
+- Common design paradigm: Seperate high-level policies (which question) from their low-level mechanisms (how question), a form of modularity
+4.2 Process API
+- APIs which are available on any OS for processes: Create, destroy, wait (for it to stop running), miscellaneous control (e.g. suspend: Stopping and resuming), status
+4.3 Process Creation: A Little More Detail
+- 1st step: Load the program's code and static data into memory from disk (where they are stored in an executable format)
+- Eagerly: Loading all at once (early OSs) vs. lazily: Loading pieces as they are needed (modern OSs, see paging and swapping)
+- 2nd step: Allocating memory for the run-time stack and heap (OS will alocate more memory for the heap if there is not enough)
+- Other initialization tasks related to I/O (e.g. opening file descriptors like stdin, stdout and stderr on UNIX)
+- Last step: Juming to the main() routine, transfering control of the CPU to the process
+4.4 Process States
+- Running: Process is running on a process, executing instructions
+- Ready: Ready to run, but for some reason the OS does not run it
+- Blocked: Process has performed an operation that makes it not ready to run until some other event takes place (e.g. an I/O reuqest to a disk)
+- Moved from ready to running: Process has been scheduled vs. moved from running to ready: Process has been descheduled
+- How to switch between states is decided by the OS scheduler
+4.5 Data Structures
+- OS tracks the state of each process, has a process/task list for all process that are ready, ...
+- Context switch: Saving registers when stopping a process, restoring them, ...
+- Process control block (PCB)/Process Descriptor: A C structure that contains information about each process
+- Final/Zombie (on UNIX) state: A process that has exited but has not yet been cleaned up, usually used by the parent process to examine the return code
+
+Homework
+1. 
+The CPU utilization should be at 100% as there are no I/O operations which could block the process.
+
+2.
+It takes 11 time units: 4 for the first process on the CPU, 1 for the I/O initiation on the CPU, 5 for the I/O and 1 for the I/O completion on the CPU
+
+3.
+Switching the order matters. While the first process is blocked, waiting for I/O, the second can run on the cpu. It only takes 7 time units (as long as the first process would need alone).
+
+4.
+Now switching the order does not matter, as the second process stays ready while the first process is doing I/O.
+
+5.
+See the answer to the 3rd question.
+
+6.
+System resources are not effectively used as the first process doing the I/O has to wait for third and fourth process to finish, only to do I/O again after they are finished. Process 3 and 4 should run while process 1 is still doing I/O.
+
+7.
+System resources are more effectively used as process 3 and 4 run while process 1 is doing I/O, not having process 1 to wait for them to finish. It might be a good idea to keep a process that does I/O running as it will likely do it again.
+
+8.
+./process-run.py -s 1 -l 3:50,3:50
