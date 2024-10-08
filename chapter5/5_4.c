@@ -20,7 +20,7 @@ int main() {
         //execl("/bin/ls", "ls", NULL);
         
         // Provide path of binary and use envp
-        //execle("/bin/sh", "sh", "/home/pocketlab/chapter5/5_4-test.sh", NULL, envp);
+        execle("/bin/sh", "sh", "5_4-test.sh", NULL, envp);
         
         // Use $PATH
         //execlp("ls", "ls", NULL);
@@ -29,10 +29,10 @@ int main() {
         //execv("/bin/ls", args);
         
         // Use $PATH and take an array as arguments
-	    //execvp("ls", args);
+	//execvp("ls", args);
 
         // Use $PATH, take an array as arguments and use envp
-        execvpe("ls", args, envp);
+        //execvpe("ls", args, envp);
     } else {
         wait(NULL);
     }
