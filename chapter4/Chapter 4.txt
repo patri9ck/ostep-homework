@@ -241,5 +241,5 @@ DONE     BLOCKED
 DONE     BLOCKED
 DONE     IO_DONE
 DONE     CPU
-IO_RUN_IMMEDIATE did not create a difference.
+IO_RUN_IMMEDIATE saved a tick with a seed of 3.
 SWITCH_ON_END creates a much worse CPU utilization. Process 2 could use the CPU while process 1 is busy doing IO without it.
