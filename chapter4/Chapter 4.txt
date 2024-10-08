@@ -29,6 +29,11 @@
 - Process control block (PCB)/Process Descriptor: A C structure that contains information about each process
 - Final/Zombie (on UNIX) state: A process that has exited but has not yet been cleaned up, usually used by the parent process to examine the return code
 
+Lecture
+- PSW (Processor Status Word): 64 Bit, one bit stores whether a process is in kernel or user mode (important for permissions), stored in PCB.
+- Kernel does not use FPU (Floating Point Unit).
+- Context is stored in kernel.
+
 Homework
 1. 
 The CPU utilization should be at 100% as there are no I/O operations which could block the process.
@@ -40,7 +45,7 @@ It takes 11 time units: 4 for the first process on the CPU, 1 for the I/O initia
 Switching the order matters. While the first process is blocked, waiting for I/O, the second can run on the cpu. It only takes 7 time units (as long as the first process would need alone).
 
 4.
-Now switching the order does not matter, as the second process stays ready while the first process is doing I/O.
+Now switching the order dones not matter, as the second process stays ready while the first process is doing I/O.
 
 5.
 See the answer to the 3rd question.
@@ -53,3 +58,56 @@ System resources are more effectively used as process 3 and 4 run while process 
 
 8.
 ./process-run.py -s 1 -l 3:50,3:50
+0        1
+CPU      READY
+IO       READY
+BLOCKED  CPU
+BLOCKED  CPU
+BLOCKED  CPU
+BLOCKED  DONE
+BLOCKED  DONE
+IO_DONE  DONE
+IO       DONE
+BLOCKED  DONE
+BLOCKED  DONE
+BLOCKED  DONE
+BLOCKED  DONE
+BLOCKED  DONE
+IO_DONE  DONE
+./process-run.py -s 2 -l 3:50,3:50
+0        1
+IO       READY
+BLOCKED  CPU
+BLOCKED  IO
+BLOCKED  BLOCKED
+BLOCKED  BLOCKED
+BLOCKED  BLOCKED
+IO_DONE  BLOCKED
+IO       BLOCKED
+BLOCKED  IO_DONE
+BLOCKED  IO
+BLOCKED  BLOCKED
+BLOCKED  BLOCKED
+BLOCKED  BLOCKED
+IO_DONE  BLOCKED
+CPU      BLOCKED
+DONE     IO_DONE
+./process-run.py -s 3 -l 3:50,3:50
+0        1
+CPU      READY
+IO       READY
+BLOCKED  IO
+BLOCKED  BLOCKED
+BLOCKED  BLOCKED
+BLOCKED  BLOCKED
+BLOCKED  BLOCKED
+IO_DONE  BLOCKED
+CPU      READY
+DONE     IO
+DONE     BLOCKED
+DONE     BLOCKED
+DONE     BLOCKED
+DONE     BLOCKED
+DONE     BLOCKED
+DONE     IO_DONE
+DONE     CPU
