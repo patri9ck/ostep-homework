@@ -1,0 +1,86 @@
+6.0 Mechanism: Limited Direct Execution
+- By time sharing the CPU, virtualization is achieved.
+- Challenges in building virtualization: Performance and control (e.g. forbidding the process to acess information it is not allowed to)
+- Both hardware and OS support is required
+6.1 Basic Technique: Limited Direct Execution
+- Limited direct execution makes a program run as fast as it is expected to
+- Direct execution: Run the program directly on the CPU
+- Direct execution protocol without limits:
+  0S                                Program
+  1. Create entry for process list
+  2. Allocate memory for program
+  3. Load program into memory
+  4. Set up stack with argc/argv
+  5. Clear registers
+  6. Execute call main()
+                                    7. Run main()
+                                    8. Execute return from main
+  9. Free memory of process
+  10. Remove from process list
+  Problems:  - How can the OS make sure the process only does things it is allowed to and still making it run efficiently?
+             - How can the OS implement time sharing required to virtualize the CPU?
+- Without limits, the OS would be "just a library".
+6.2 Problem #1: Restricted Operations
+- Direct execution is fast as the program runs natively on the CPU but does not answer what happens if the process wishes to perform a restricted operation (such as I/O).
+- A process must be able to perform restricted operations but cannot be allowed have complete control over the system.
+- System calls such as open() or read() look like typical procedure calls in C but include a trap instruction.
+- The C library uses an agreed-upon calling convention with the kernel to put arguments (e.g. for open()) and the system-call number in well-known locations (e.g. on the stack or in specific registers) and then executes trap.
+- After the call to trap, the library unpacks return values and returns control to the program that issued the system call.
+- The parts of the C library that make system calls are coded in assembly as they need to follow conventions in order to process arguments and returns values correctly and to execute the hardware-specific trap instruction.
+- One process cannot be allowed to do to any restricted operation as for example, a file system that checks permission before giving access to a file would not be protective anymore.
+- To prevent this, user mode exists: Code that runs in user mode is restricted in what it can do. For example, the code cannot issue an I/O request, and if it still does it, the processor raises an exception
+- The operating system runs in kernel mode and can execute all restricted instructions.
+- User process can still execute restricted operations by making a system call.
+- System calls allow the kernel to carefully expose certain functionality to user programs (e.g. accessing files, creating/destroying processes, communicating with others, allocating more memory, ...).
+- Most OSs include a few hundred system calls.
+- To execute a system call, a program must execute a special trap instruction which jumps into the kernel and raises privilege level to kernel mode.
+- When finished, the OS calls a return-from-trap instruction which returns into the calling user program and reduces the privilege level back to user mode.
+- The hardware must save enough of the caller's registers. On x86, they include the program counter, flags and a few other and are stored in a per-process kernel stack.
+- Upon the return-from-trap instruction, the registers are popped of the stack and execution of the user-mode program is resumed.
+- How does the trap known which code to run inside the OS? Very Bad Idea: Letting the calling process specify an address to jump to (it could jump into code to access a file, but just after the permission check).
+- The kernel sets up a trap table: When the OS boots, it configures the hardware by telling it what code to run when an exceptional event occurs including what to do when a program makes a system call (or when a harddisk or keyboard interrupt occurs for example).
+- The OS informs the hardware about the location of the trap handlers, usally with a special instruction. The hardware remembers it until the machine is rebooted.
+- Limited Direct Execution protocol:
+  Boot:
+  0S                                  Hardware
+  1. Initialize trap table
+                                      2. Remember adress of syscall/trap handler
+  Run:
+  0S                                      Hardware                                  Program (user mode)
+  1. Create entry for process list    
+  2. Allocate memory for program
+  3. Load program into memory
+  4. Setup user stack with argc/argv
+  5. Fill kernel stack with registers/PC
+  6. return-from-trap
+                                          7. Restore registers from kernel stack
+                                          8. Move to user mode
+                                          9. Jump to main()
+                                                                                    10. Run main()
+                                                                                    11. ...
+                                                                                    12. Make system call
+                                                                                    13. trap
+                                          14. Save registers to kernel stack
+                                          15. Move to kernel mode
+                                          16. Jump to trap handler
+  17. Handle work
+  18. Do work of system call
+  19. return-from-tap
+                                          20. Restore registers from kernel stack
+                                          21. Move to user mode
+                                          22. Jump to PC after trap
+                                                                                    23. ...
+                                                                                    24. Return from main()
+                                                                                    25. trap (via exit())
+  26. Free memory of process
+  27. Remove from process list
+- To specify the exact system call, a system-call number is usually assigned to each system-call which must be placed by the user code to the disired regster or to the specified location on the stack.
+- The OS examines the system-call number and executes the corresponding code if it is valid.
+- This serves as a form of proection: The user code cannot specify an address to jump to, but has to request a particular service via the system-call number.
+- Setting up the trap handlers is a priviliged operation. The hardware prevents the instruction from being executed in user mode.
+- In the limited direct execution (LDE) protocol, there are two phases:
+  1. At boot time: The OS initializes the trap table and the CPU remebers its location.
+  2. When running a process: The kernel sets up a few things and uses return-from-trap to start the execution of the process. The CPU is switched to user mode and runs the process.
+- When the process issues a system call, it traps back into the OS which handles it and returns control via a treturn-from-trap to the process. When returning from main(), some stub code will properly exit the program (by calling the exit() system call. The OS cleans up.  
+  
+  
