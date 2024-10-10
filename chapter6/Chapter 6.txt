@@ -95,3 +95,7 @@
 - Non-cooperative approach: Timer interrupt: A timer device raises an interrupt every few milliseconds to halt the currently running process and an interrupt handler in the OS runs.
   - At boot, the OS informs the hardware about which code to run when the timer interrupt occurs and starts the timer which are two privileged operations. The timer can also be turned off which is a privileged operation as well.
   - The hardware has to save enough of the state of the running program so that a return-from-trap instruction is able to restore it. The behavior of the hardware is similar to an explicit system-call trap into the kernel.
+- Whether to continue running the currently-running process or switching to another is decided by the OS as soon as it regains control.
+- If the OS decides to switch the process, the OS executes low-level code called a context switch: It saves registers for the currently-running process (e.g. onto the kernel stack) and restores them for the process that is about to run (from the kernel stack). That makes the system resume execution of another process when the return-from-trap instruction is ran.
+- Low-level assembly code is executed by the OS to save the context of the currently-running process. It saves general purpose registers, PC and the kernel stack pointer of the currently-running process and restores them for the soon-to-be-executin process. By switching stacks, the kernel starts running the switch code in the context of one process and returns in the context of another.
+
