@@ -100,4 +100,30 @@
 - Low-level assembly code is executed by the OS to save the context of the currently-running process. It saves general purpose registers, PC and the kernel stack pointer of the currently-running process and restores them for the soon-to-be-executin process. By switching stacks, the kernel starts running the switch code in the context of one process and returns in the context of another.
 - Rebooting helps building robust systems as it moves software back to a known and likely more tested state. Stale or leaked resources (like memory) are reclaimed. Reboots can be easily automated.
 - The switch() routine saves current register values into the process structure of the currently-running process and restores the registers of the soon-to-be-executing process. It then switches contexts by changing the stack pointer to use the kernel stack of the soon-to-be-executing process instead of the currently-running process.
-
+- Two register saves/restores happen: Firstly, when the timer interrupt occurs, user registers of the running process are saved by the hardware using the kernel stack of that process. Secondly, when the OS decides to switch the process, the kernel registers are saved by the software into memory of the process structure of the process as if the system did not trap into the kernel from the currently-running process but from the soon-to-be-executin process:
+  Boot:
+  0S                                                        Hardware
+  1. Initialize trap table
+                                                            2. Remember adress of syscall/trap handler
+  3. Start interrupt timer
+                                                            4. Start timer
+                                                            5. Interrupt CPU in X milliseconds
+  Run:
+  0S                                                        Hardware                                          Program (user mode)
+                                                                                                              1. Process A
+                                                                                                              2. ...
+                                                            3. Timer interrupt
+                                                            4. Save registers from A to kernel stack of A
+                                                            5. Move to kernel mode
+                                                            6. Jump to trap handler
+  7. Handle the trap
+  8. Call switch() routine:
+     Save registers from A to process structure of A
+     Restore registers from B from process structure of B
+     Switch to kernel stack of B
+  9. return-from-trap (into B)
+                                                            10. Restore registers from B from kernel stack of B
+                                                            11. Move to user mode
+                                                            12. Jump to PC from B
+                                                                                                                13. Process B
+                                                                                                                14. ...
