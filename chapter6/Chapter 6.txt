@@ -127,3 +127,14 @@
                                                             12. Jump to PC from B
                                                                                                                 13. Process B
                                                                                                                 14. ...
+
+
+6.4 Worried About Concurrency?
+- Whats happens, when during a system call, a timer interrupt occurs?
+- During interrupt processing, the OS could disable interrupts. Disabling interrupts for too long could result in lost interrupts which is "bad".
+- Locking schemes to protect concurrent access to interal data structures enable multiple activities within the kernel at the same time which is especially useful on multiprocessors.
+
+6.5 Summary
+- Limited direct execution is a set of low-level mechanisms to implement CPU virtualization.
+- The OS "baby proofs" the CPU by setting up the trap handlers, starting an interrupt timer and by only running processes in user mode.
+- OS intervention is only required to perform priviliged operations or when processes use CPU for too long.
