@@ -2,6 +2,7 @@
 - By time sharing the CPU, virtualization is achieved.
 - Challenges in building virtualization: Performance and control (e.g. forbidding the process to acess information it is not allowed to)
 - Both hardware and OS support is required
+
 6.1 Basic Technique: Limited Direct Execution
 - Limited direct execution makes a program run as fast as it is expected to
 - Direct execution: Run the program directly on the CPU
@@ -20,6 +21,7 @@
   Problems:  - How can the OS make sure the process only does things it is allowed to and still making it run efficiently?
              - How can the OS implement time sharing required to virtualize the CPU?
 - Without limits, the OS would be "just a library".
+
 6.2 Problem #1: Restricted Operations
 - Direct execution is fast as the program runs natively on the CPU but does not answer what happens if the process wishes to perform a restricted operation (such as I/O).
 - A process must be able to perform restricted operations but cannot be allowed have complete control over the system.
@@ -42,9 +44,9 @@
 - The OS informs the hardware about the location of the trap handlers, usally with a special instruction. The hardware remembers it until the machine is rebooted.
 - Limited Direct Execution protocol:
   Boot:
-  0S                                  Hardware
+  0S                                      Hardware
   1. Initialize trap table
-                                      2. Remember adress of syscall/trap handler
+                                          2. Remember adress of syscall/trap handler
   Run:
   0S                                      Hardware                                  Program (user mode)
   1. Create entry for process list    
@@ -81,6 +83,15 @@
 - In the limited direct execution (LDE) protocol, there are two phases:
   1. At boot time: The OS initializes the trap table and the CPU remebers its location.
   2. When running a process: The kernel sets up a few things and uses return-from-trap to start the execution of the process. The CPU is switched to user mode and runs the process.
-- When the process issues a system call, it traps back into the OS which handles it and returns control via a treturn-from-trap to the process. When returning from main(), some stub code will properly exit the program (by calling the exit() system call. The OS cleans up.  
-  
-  
+- When the process issues a system call, it traps back into the OS which handles it and returns control via a treturn-from-trap to the process. When returning from main(), some stub code will properly exit the program (by calling the exit() system call. The OS cleans up.
+
+6.3 Problem #2: Switching Between Processes
+- The OS is not running by definition if a process is running on CPU.
+- Cooperative approach: The OS trusts the processes to peridically give up the CPU so that the OS can run other tasks.
+  - The processes transfer control of the CPU to the OS by making system calls.
+  - Systems like this include a yield system call to simply transfer control to the OS.
+  - Processes also transfer control by doing illegal operations (e.g. dividing by zero, trying to access memory they are not allowed to access) which will generate a trap.
+  - Problem: If a process ends up in an infinite loop, the only solution is to reboot the machine.
+- Non-cooperative approach: Timer interrupt: A timer device raises an interrupt every few milliseconds to halt the currently running process and an interrupt handler in the OS runs.
+  - At boot, the OS informs the hardware about which code to run when the timer interrupt occurs and starts the timer which are two privileged operations. The timer can also be turned off which is a privileged operation as well.
+  - The hardware has to save enough of the state of the running program so that a return-from-trap instruction is able to restore it. The behavior of the hardware is similar to an explicit system-call trap into the kernel.
