@@ -51,3 +51,31 @@
 - If three jobs with the same completion time arrive at the same time, the third job will have to wait for the first and second to complete.
 
 7.7 Round Robin
+- Round Robin (RR) runs a job for a time slice (also called a scheduling quantum) instead of running a job to completion and then switches to the next job in the run queue. This is repated until all jobs are finished.
+- RR is sometimes called time-slicing.
+- The length of a time slice must be a multiple of the timer-interrupt period.
+- Amortization is used in systems with a fixed cost to an operation. By performing the operation fewer times, the total cost is reduced. If the time slice is set to 10 ms and the context-switch cost is 1 ms, the context-switch wastes 10% of time. By increasing the time slice to 100 ms, the context switch only takes 1% of time. The cost of time-slicing has been amortized.
+- With three jobs A, B and C arriving at the same time and each wishing to run for 5 seconds, the average response time of RR is (0+1+2)/3 = 1. With SJF, it would be (0+5+10)/3 = 5.
+- The shorter the time slice, the better is the response-time under RR.
+- A time slice too short will make the cost of context switching dominate performance. The time slice has to be long enough to amortize the cost of context switching without making it too long so that the system is unresponsive.
+- The cost of context switching does not only arise from the OS by saving and restoring registers, but also from CPU caches, TLBs, branch predictors and other on-chip hardware. Switching the job causes this state to be flushed and a new state relevant to the currently-running process to be brought in which may be a noticeable perfomance cost.
+- RR is one of the worst policies if it comes to turnaround time. A, B and C have an average response time of 14.
+- Any policy that is fair (such as RR) will perform poorly on turnaround time. If the policy is unfair, shorter jobs can be ran to completion at the cost of response time. If the policy is fair, response time is lowered at the cost of turnaround time. This trade-off is common in systems.
+- SJF and STCF optimize turnaround time while RR optimizes response time.
+
+7.8 Incorporating I/O
+- During I/O, the currently-running job will not use the CPU and is blocked waiting for the I/O completions, so the scheduler should schedule another job on the CPU.
+- When the I/O is completed, an interrupt is raised and the process is moved from blocked to ready state. The OS could decide to run that process right away.
+- With a STCF scheduler, two jobs A and B, where A and B use the CPU for 50 ms, but A issues an I/O request after 10 ms which takes 10 ms, then uses the CPU for 10 ms again, then issues an I/O request again and so on:
+  - A is broken up into 5 10-ms sub-jobs. Each sub-job is treated as an independent job.
+  - STCF will choose the shorter job, which is A.
+  - When the first sub-job has completed, only B is left and begins running.
+  - When A finishes the first I/O request, a new sub-job of A is submitted and it preempts B and runs for 10 ms. 
+  - This allows overlap: The CPU is being used by one process while waiting for the I/O of another process to complete.
+  - By treating each CPU burst as a job, the scheduler makes sure that process which are "interactive" are ran frequently. While they are performing I/O, the CPU can be used by CPU-intensive jobs, so the CPU is better utilized.
+
+7.9
+- In a general-purpose OS, very little is known about the processes. It is unrealistic that the OS knows the length of each process.
+
+7.10
+- A scheduler that uses the recent past to predict the future so it can solve the problem of not known the length of each process is known as the multi-level feedback queue.
