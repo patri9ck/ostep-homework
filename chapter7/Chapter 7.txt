@@ -1,0 +1,53 @@
+7.0 Scheduling: Introduction
+- High-level scheduling policies are somtimes called disciplines.
+
+7.1 Workload Assumptions
+- Workload: Processes running in the system
+- Goal: A fully-operational-scheduling discipline
+- Assumptions for jobs (Processes):
+  - Each jobs runs for the same amount of time.
+  - All jobs arrive at the same time.
+  - Once started, each job runs to completions.
+  - All jobs only usse the CPU (no I/O).
+  - The run-time of each job is known.
+
+7.2 Scheduling Metrics
+- A scheduling metric is used to compare different scheduling policies.
+- A metric is something to measure something, there are many that make sense in scheduling.
+- Turnaround time: A metric that measures the time of a job it completes minus the time it arrives:
+  T(turnaround) = T(completion) - T(arrival)
+- As all jobs arrive at the same time: T(arrival) = 0 and T(turnaround) = T(completion).
+- The turnaround time is a performance metric.
+- Fairness is another metric of interest. A scheduler could optimize performance but at the cost of preventing a few jobs.
+
+7.3 First In, First Out (FIFO)
+- Simple and easy to implement: First In, First Out (FIFO)/First Come, First Served (FCFS)
+- Example: Jobs A, B, C arrive at roughly the same time, but with A before B and B before C. All processes take 10 seconds.
+  - The turnaround time for A will be 10 seconds, for B 20 seconds and for C 30 seconds:
+  - The average turnaround time will be: (10 + 20 + 30)/3 = 20.
+  - If A runs 100 seconds instead of 10, the average turnaround time is increased to 110.
+    - This describes the convoy effect: Relatives-short resource consumers are queued behind a heavyweight resource consumer.
+- Shortes Job First (SJF) is like a "ten-item-or-less" line in a grocery store and is used where turnaround time matters.
+
+7.4 Shortest Job First (SJF)
+- The shortes job is first ran, then the next shortest, and so on.
+- With the example of 7.3, the average turnaround time is decreased to 50.
+- Non-preemptive schedulers: Each job is run to completions before it is considered whether to run a new job.
+- All modern schedulers are preemptive and will stop one process to run another, the scheduler can perform a context switch.
+- If all processes do not arrive at the same time anymore, with A arriving at t = 0, running 100 seconds, and B and C arriving at t = 10 and running for 10 seconds, B and C will suffer a convoy problem with SJF.
+  - The average turnaround time is 103.33 seconds: (100+(110-10)+(120-10))/3 = 103.33.
+
+7.5 Shortest Time-to-Completion First (STCF)
+- To improve average turnaround time, jobs do not have to run to completion anymore.
+- The scheduler can preempt job A when B and C arrive and run them and can later continue A.
+- Preemption added to SJF: Shortest Time-to-Completion First (STCF)/Preemptive Shortest Job First (PSJF)
+- Everytime a new job arrives, the scheduler runs the job that has the least time left.
+- The turnaround time is decreased to 50 seconds.
+
+7.6 A New Metric: Response Time
+- Response time started mattering when time-shared machines arrived.
+- It is defined as: T(response) = T(firstrun) - T(arrival)
+- With the example from 7.5, the response time is 0 for A and B and 10 for C. The average response time is 3.33.
+- If three jobs with the same completion time arrive at the same time, the third job will have to wait for the first and second to complete.
+
+7.7 Round Robin
