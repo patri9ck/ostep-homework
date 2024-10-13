@@ -1,0 +1,18 @@
+8.0 Scheduling: The Multi-Level Feedback Queue
+- The Multi-level Feedback Queue (MLFQ) tries to optimize turnaround time and response time without knowing how long a process will run.
+- MLFQ is an example of a system that learns from the past to predict the future.
+  - It works when jobs have phases of behavior which make them predictable.
+  - Such techniques can lead to worse decisions than not knowing anything at all. One must be careful.
+
+8.1 MLFQ: Basic Rules
+- The specifics of many MLFQ implementations differ but most approaches are similar.
+- There are distinc queues with a different priority level. A job that is ready to run is on a single queue.
+  - The priorities are used to decide which job to run. A job with higher priority (on a queue with higher priority) is chosen to run.
+  - If there are multiple jobs on a queue, round-robin scheduling is used among them.
+  => Rule 1: If Priority(A) > Priority(B), A runs (B does not).
+  => Rule 2: If Priority(A) = Priority(B), A & B run in RR.
+- Priorites of job are varied based on their behavior observed. They are not fixed.
+  - If a job repeatedly does not use the CPU as it is waiting for keyboard input, its priority is kept high.
+  - If a job uses the CPU intensively for long periods of time, its priority is reduced.
+  - MLFQ uses the history of the job to learn about it and predict its future behaviour.
+
