@@ -39,3 +39,40 @@
   - A scheduling policy is a security concern in many cases as - without care in policy design and enforcement - a single user may be able to adversely harm others and gain advantage for itself.
 
 8.3 Attempt #2: The Priority Boost
+- To avoid starvation, the priority of all jobs could be boosted periodically.
+  => Rule 5: After some time period S, move all the jobs in the system to the topmost queue.
+- Two problems are solved that way:
+  1. Processes are guaranteed not to starve.
+  2. If a CPU-bound job becomes interactive, it will be treated properly by the scheduler once it has received the priority boost.
+- Example: A long-running job competing for the CPU with two short-running job will get a priority boost every 100 ms and will therefore get to run every 100 ms periodically.
+- What should S be set to?
+  - If S is set too high, long-running jobs could starve.
+  - If S is set too low, interactive jobs may not get a proper share of the CPU.
+
+8.4 Attempt #3: Better Accounting
+- How to prevent gaming of the scheduler? Instead of forgetting how much of its allotment the process used, it should keep track of it. Once a process has used it, it is demoted to the next priority queue. Rule 4a and 4b are rewritten to:
+  => Rule 4: Once a job uses up its time allotment at a given level, regardless of how many times it has given up the CPU, its priority is reduced.
+
+8.5 Tuning MLFQ And Other Issues
+- How to parameterize such a scheduler?
+  - How many queues?
+  - How big should the time slice be per queue?
+  - How big should the allotment be?
+  - How often should the priority be boosted?
+- High priority queues often have a short time slice of 10 or fewer milliseconds as they are compromised of interactive jobs, so alternatving quickly between them makes sense.
+- Low priority queues have longer time slices like 100 ms as they contain long-running jobs that are CPU-bound.
+- The Solaris MLFQ implementation/Time-Sharing scheduling class/TS is configured through a set of tables that determine exactly how the priority of a process is altered, how long each time slice is and how often the priority of a job is boosted.
+  - Administrators can edit this table to make the scheduler behave in different ways.
+  - Default values for the table are 60 queues, with increasing time-slice length from 20 milliseconds for the highest priority to a few hundred milliseconds for the lowest priority. Priorities are boosted around every 1 second.
+- FreeBSD uses a formula to calculate the current priority level of a job based of how much CPU the process has used. Such a decay-usage algorithm decays the usage over time, the desired priority boost is provided differently.
+- Some operating systems reserve the highest priority level for operating system work, user jobs can never obtain them.
+- With the command utility nice, some systems allow the user to increase or decrease the priority of a job somewhat.
+- As the OS does not know what is best for each process, it is useful to provide interfaces to allows users to provide hints to the OS. Those Hints are often called advice, which might be taken by the OS into account to make a better decision.
+
+8.6 MLFQ: Summary
+- MLFQ has multiple levels of queues and uses feedback to determine the priority of a given job.
+=> Rule 1: If Priority(A) > Priority(B), A runs (B does not).
+=> Rule 2: If Priority(A) = Priority(B), A & B run in RR.
+=> Rule 3: When a job enters the system, it is placed at the highest priority.
+=> Rule 4: Once a job uses up its time allotment at a given level, regardless of how many times it has given up the CPU, its priority is reduced
+=> Rule 5: After some time period S, move all the jobs in the system to the topmost queue.
