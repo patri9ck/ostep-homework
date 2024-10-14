@@ -76,3 +76,57 @@
 => Rule 3: When a job enters the system, it is placed at the highest priority.
 => Rule 4: Once a job uses up its time allotment at a given level, regardless of how many times it has given up the CPU, its priority is reduced
 => Rule 5: After some time period S, move all the jobs in the system to the topmost queue.
+
+Homwework
+1. 
+./mlfq.py -j 2 -n 2 -M 0 -m 10 -q 5
+Job  0: startTime   0 - runTime   8 - ioFreq   0
+Job  1: startTime   0 - runTime   4 - ioFreq   0
+
+0: Job 0 arrives
+0: Job 1 arrives
+0: Job 0 CPU (Q1)
+1: Job 0 CPU (Q1)
+2: Job 0 CPU (Q1)
+3: Job 0 CPU (Q1)
+4: Job 0 CPU (Q1)
+5: Job 1 CPU (Q1)
+6: Job 1 CPU (Q1)
+7: Job 1 CPU (Q1)
+8: Job 1 CPU (Q1), finished
+9: Job 0 CPU (Q0)
+10: Job 0 CPU (Q0)
+11: Job 0 CPU (Q0), finished
+
+./mlfq.py -j 2 -n 2 -M 0 -m 10 -q 5 -s 2
+Job  0: startTime   0 - runTime   9 - ioFreq   0
+Job  1: startTime   0 - runTime   1 - ioFreq   0
+
+0: Job 0 arrives
+0: Job 1 arrives
+0: Job 0 CPU (Q1)
+1: Job 0 CPU (Q1)
+2: Job 0 CPU (Q1)
+3: Job 0 CPU (Q1)
+4: Job 0 CPU (Q1)
+5: Job 1 CPU (Q1), finished
+6: Job 0 CPU (Q0)
+7: Job 0 CPU (Q0)
+8: Job 0 CPU (Q0)
+9: Job 0 CPU (Q0), finsihed
+
+./mlfq.py -j 2 -n 2 -M 0 -m 10 -q 5 -s 3
+Job  0: startTime   0 - runTime   3 - ioFreq   0
+Job  1: startTime   0 - runTime   4 - ioFreq   0
+0: Job 0 arrives
+0: Job 1 arrives
+0: Job 0 CPU (Q1)
+1: Job 0 CPU (Q1)
+2: Job 0 CPU (Q1), finished
+3: Job 1 CPU (Q1)
+4: Job 1 CPU (Q1)
+5: Job 1 CPU (Q1)
+6: Job 1 CPU (Q1), finished
+
+2.
+8.2
