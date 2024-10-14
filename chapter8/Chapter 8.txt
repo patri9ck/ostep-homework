@@ -26,5 +26,16 @@
   - A long-running job with a time slice and allotment to 10 ms will have its priority reduced every 10 ms.
   - In a three-queue scheduler, it enters at the highest queue and will end up in the lowest queue after 20 ms.
 - Example 2: Along Came A Short Job
+  - A is a long-running CPU-intensive job and has been running for some time and is therefore in the lowest-priority queue.
+  - B arrives and is inserted into the highest queue. It has a short run-time of 20 ms so it can complete before reaching the bottom queue, in two time slices.
+  - After B, A can resume.
+  - The example shows on of the main goal of the algorithm. As it does not know the length of a job, it first assumes it might be a short job. If it is actually a short, it will run quickly and complete. If it is not, it will slowly move down the queues.
+- Example 3: What About I/O?
+  - With an interactive job B that needs the CPU only for 1 ms before performing I/O and a long-running batch job A, B is kept at the highest priority as it keeps releasing the CPU.
+  - That way, MLFQ archives its goal by running interactive jobs quickly.
+- Problems With Our Current MLFQ
+  - Starvation: If there are too many interactive jobs, they will combine to consume the CPU all time. Long-running jobs will never receive any CPU and starve.
+  - Gaming the scheduler: A process could trick the scheduler by issuing an I/O operation before the allotment is used to remain in the same queue. A job could nearly monopolize the CPU that way.
+  - A scheduling policy is a security concern in many cases as - without care in policy design and enforcement - a single user may be able to adversely harm others and gain advantage for itself.
 
-
+8.3 Attempt #2: The Priority Boost
