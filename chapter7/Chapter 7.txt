@@ -79,3 +79,101 @@
 
 7.10
 - A scheduler that uses the recent past to predict the future so it can solve the problem of not known the length of each process is known as the multi-level feedback queue.
+
+Homework:
+1.
+./scheduler.py j 3 -p FIFO -l 200,200,200
+Turnaround time:
+Job 0: T = 200
+Job 1: T = 400
+Job 2: T = 600
+Average: T = 1200 / 3 = 400
+
+Response time:
+Job 0: T = 0
+Job 1: T = 200
+Job 2: T = 400
+Average: 600 / 3 = 200
+
+./scheduler.py j 3 -p SJF -l 200,200,200
+Turnaround time:
+Job 0: T = 200
+Job 1: T = 400
+Job 2: T = 600
+Average: T = 1200 / 3 = 400
+
+Response time:
+Job 0: T = 0
+Job 1: T = 200
+Job 2: T = 400
+Average: 600 / 3 = 200
+
+2.
+./scheduler.py j 3 -p FIFO -l 100,200,300 
+Turnaround time:
+Job 0: T = 100
+Job 1: T = 300
+Job 2: T = 600
+Average: T = 1000 / 3 = 333
+
+Response time:
+Job 0: T = 0
+Job 1: T = 100
+Job 2: T = 300
+Average: T = 400 / 3 = 133
+
+./scheduler.py j 3 -p SJF -l 100,200,300
+Turnaround time:
+Job 0: T = 100
+Job 1: T = 300
+Job 2: T = 600
+Average: T = 1000 / 3 = 333
+
+Response time:
+Job 0: T = 0
+Job 1: T = 100
+Job 2: T = 300
+Average: T = 400 / 3 = 133
+
+3.
+/scheduler.py j 3 -p RR -l 200,200,200 -q 1
+Turnaround time:
+Job 0: T = 598
+Job 1: T = 599
+Job 2: T = &00
+Average: T = 599
+
+Response time:
+Job 0: T = 0
+Job 1: T = 1
+Job 2: T = 2
+Average: T = 1
+
+./scheduler.py j 3 -p RR -l 100,200,300 -q 1
+Turnaround time:
+Job 0: T = 298
+Job 1: T = 499
+Job 2: T = 600
+Average: 465
+
+Response time:
+Job 0: T = 0
+Job 1: T = 1
+Job 2: T = 2
+Average: T = 1
+
+4.
+- As seen in exercise 1 and 2, SJF and FIFO produce the same result as long as the jobs are orderd ascending based on their length or have the same length.
+- If there is only one process, they will also produce the same output.
+
+5.
+- If all jobs have the same duration, and no job takes longer than a time slice, RR and SJF will produce the same output.
+- If there is only one process.
+
+6.
+- See the graph. There is a linear connection between both.
+
+7.
+- See the graph. The response time becomes stable after a certain quantum length.
+- T(response) = Q * (N - 1) (Q: Quantum length, N: # Jobs)
+
