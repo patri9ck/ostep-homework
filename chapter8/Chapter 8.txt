@@ -118,6 +118,7 @@ Job  1: startTime   0 - runTime   1 - ioFreq   0
 ./mlfq.py -j 2 -n 2 -M 0 -m 10 -q 5 -s 3
 Job  0: startTime   0 - runTime   3 - ioFreq   0
 Job  1: startTime   0 - runTime   4 - ioFreq   0
+
 0: Job 0 arrives
 0: Job 1 arrives
 0: Job 0 CPU (Q1)
@@ -129,4 +130,11 @@ Job  1: startTime   0 - runTime   4 - ioFreq   0
 6: Job 1 CPU (Q1), finished
 
 2.
-8.2
+8.2:
+./mlfq.py -n 3 -q 10 -a 1 -l 0,200,0 -B 0
+
+8.3 Left:
+./mlfq.py -n 3 -q 10 -a 1 -l 0,200,0:100,20,0
+
+8.3 Right:
+./mlfq.py -n 3 -q 10 -a 1 -i 5 -l 0,175,0:50,25,1
