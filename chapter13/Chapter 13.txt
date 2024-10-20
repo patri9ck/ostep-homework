@@ -1,0 +1,36 @@
+13.1 Early Systems
+- Early machines did not provide much of an abstraction to users
+    - The OS was a set of routines (more like a library) which sat in memory starting at address 0.
+    - There would be one running program which would use the rest of memory, for example starting at address 64.000 (64 KB).
+
+13.2 Multiprogramming and Time Sharing
+- As machines were expensive, people started to share them more effectively which led to multiprogramming.
+    - Multiple processes were ready to run and the OS would switch between them, for example when one decided to do I/O. Efficiency was increased.
+- When people began demanding more of machines and realized the imitations of batch computing, especially on programmers who had to do long debug cycles, time sharing was prefered.
+    - As many users might be concurrently using a machine, interactivity became more important for a timely response from their currently-executing tasks.
+    - A crude sharing of a machine and implementation of time time sharing would be to run one process, giving it full access to all memory, then stop it, saving all of its state to a disk and then load some other proccess's state.
+        - Problem: Saving the entire memory to disk, especially as it grows, is way too slow. Leaving a process in memory while switching between them would be a more efficient way for the OS to implement time sharing.
+    - Assuming there would be three processes, and each of them would have a small amount of memory reserved for them, the OS can choose to run the first while the other two processes are ready and queued.
+        - As time sharing and allowing multiple programs to reside concurrently in memory, new demands were places on the OS, like protection: A process should not be able to read or write some other proccess's memory.
+
+13.3 The Addres Space
+- The address space is an easy to use abstraction of physical memory and is the running program's view of the memory.
+    - It consists of all of the memory state of the running program including the code of the program (or its instructions).
+    - While the program is running, it uses a stack to keep track of where it is in the function call chain. The stack is also used to allocate local variables and pass parameters and return values to and from routines.
+    - The heap is used for dynamically-allocated, user-managed memory. It is received from a call to malloc() in C or new in object-orientated languages like C++ or Java.
+    - Statically-initialized variables are also contained in the stack.
+    - The program code is put at the top of the address space, for example starting at address 0. As it is static, it will not grow and need any more space as the program runs.
+    - The heap is placed at the top right after the program code and the stack at the bottom. This allows them two both grow (positively/downward for the malloc and negatively/upward for the stack) and shrink. They just have to grow in different positions.
+        - This is a convention, the address space could be arranged differently and must be, when multiple threads co-exist for example.
+    - When describing the address space, an abstraction of the OS to the running program is described. The program does not actually start at physical address 0 in physical memory.
+    - The OS is virtualizing memory because the running program thinks it is loaded into memory at a particular address and has a potentially very large address space like 32-bits or 64-bits while the reality is different.
+    - When a process for instance tries to perform a load at address 0, which is a virtual address, the OS, with hardware support, will have to make sure the load does not actually go to physical address 0 but rather to the physical address where the process is actually loaded.
+
+13.4 Goals
+- Transarency: Memory should be virtualized in a way that is invisible to the running program. It should behave, as if it has its own private physical memory.
+- Efficiency: The virtualization should be as efficient as possible, both in terms of time and space. To do so, the OS as to rely on hardware support, including hardware features like TLBs.
+- Protection: All processes should be protected from one another as well as the OS itself from processes. Processes should not be able to access memory contents from other processes or the OS through a load, a store or an instruction fetch.
+    - This way, protection enables isolation. Each process should run isolated from others.
+- Isolation is a key principle for reliable systems. If one entitiy fails, it won't affect the other when they are properly isolated.
+    - OSs strive to isolated processes from each other to prevent one from harming the other. With memory isolation, it is ensured that running programs cannot affect the operatio of the OS. 
+    - Using microkernels instead of typical monolithic kernel designs, some OSs take isolation even further by walling of pieces of the OS from other pieces from it.
