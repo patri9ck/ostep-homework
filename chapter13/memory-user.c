@@ -2,10 +2,6 @@
 #include <stdlib.h>
 #include <sys/resource.h>
 
-void print_memory_usage() {
-    struct rusage usage;
-    printf("Speicherverbrauch: %ld KB\n", usage.ru_maxrss);
-}
 
 int main(int argc, char **argv) {
     int n = 100;
@@ -35,8 +31,6 @@ int main(int argc, char **argv) {
             buffer[i] = i;
         }
     }
-
-    print_memory_usage();
 
     free(buffer);
 
