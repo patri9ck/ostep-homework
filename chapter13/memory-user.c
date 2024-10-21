@@ -1,5 +1,11 @@
 #include <stdio.h>
 #include <stdlib.h>
+#include <sys/resource.h>
+
+void print_memory_usage() {
+    struct rusage usage;
+    printf("Speicherverbrauch: %ld KB\n", usage.ru_maxrss);
+}
 
 int main(int argc, char **argv) {
     int n = 100;
@@ -14,19 +20,23 @@ int main(int argc, char **argv) {
         it = strtol(argv[2], NULL, 10);
     }
 
-    n = n * 1000000;
+    n = n * 1024 * 1024;
 
-    char *buffer = calloc(n, 1);
+    printf("Allocating %d Bytes\n", n);
+
+    int *buffer = malloc(n);
 
     if (buffer == NULL) {
         return 1;
     }
 
-    for (int i = 0; i < it; ++i) {
-        for (int i = 0; i < n; ++i) {
-            printf("Address after %d Byte: %p\n", i, buffer + i);
+    for (int i = 0; i < it || it < 0; ++i) {
+        for (int i = 0; i < n / sizeof(int); ++i) {
+            buffer[i] = i;
         }
     }
+
+    print_memory_usage();
 
     free(buffer);
 
