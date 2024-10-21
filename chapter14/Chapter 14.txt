@@ -1,0 +1,64 @@
+14.1 Types of Memory
+- Stack: Allocations and deallocations are managed implicity by the compiler for the programmer.
+    - Sometimes called automatic memory.
+- Heap: Allocations and deallocations are handled explicitly by the programmer. 
+
+14.2 The maloc() call
+- The amount of bytes is passed asking for room on the heap. On success, a pointer is returned, and on failure, NULL.
+- stdlib.h must be included although the C library, which all C programs link with by default, contains the code for malloc(). Adding the header lets the compiler check whether the call to malloc() is correct.
+- sizeof() returns the amount of bytes needed for a passed type or variable.
+    - For types, the size of them is known at compile-time. Therefore it is an operator and not a function call.
+- When allocating space for strings, malloc(strlen(s) + 1) should be used to also allocate space for te end-of-string character.
+- malloc() returns a pointer of type void. Through a cast, the programmer casts the return type to the wanted pointer. The cast is not needed.
+
+14.3 The free() Call
+- To free heap memory that is no longer in use, free() can be used. It takes one argument, a pointer returned by malloc.
+
+14.4 Common Errors
+- Newer languages have support for automatic memory management. In them, new and similar will call something like malloc() but the programmer never has to call something to free the space. A garbage collector runs and frees memory that is no longer referenced.
+- Forgetting To Allocate Memory
+    - Routines suc as strcpy(dst, src), which copies a string from a source pointer to a destination pointer, expect memory to be allocated before they are called.
+        char *src = "hello";
+        char *dst;
+        strcpy(dst, src);
+        
+        This will lead to a segmentation fault. malloc() can be used:
+
+        char *src = "hello";
+        char *dst = (char *) malloc(strlen(src) + 1);
+        strcpy(dst, src);
+
+        Alternatively, strdup() can be used.
+- Not Allocating Enough Memory
+    - Not allocating enough memory is also called a buffer overflow, for example when the destination buffer is not big enough.
+        char *src = "hello";
+        char *dst = (char *) malloc(strlen(src));
+        strcpy(dst, src);
+
+        Depending on the malloc() implementation, this might still work even though dst is missing one byte for the end-of-string character.
+- Forgetting to Initialize Allocated Memory
+    - If malloc() is called, but the newly-allocated data types miss a value, the program will eventualy encounter an unitialized read.
+- Forgetting To Free Memory
+    - A memory leak occurs when it is forgotten to free memory.
+    - In long-running applications or systems, slowly leaking memory eventually will lead to no more memory being left, so a restart will be required.
+- Freeing Memory Before You Are Done With It
+    - If a program frees memory before it is finished using it, it is called a dangling pointer. This can lead to a crash or overwriting valid memory, when malloc() is called again after free().
+- Leaking memory in short-lived program often does not cause any operational problems, although it is still considered poor form. The OS performs the first level of memory management and will reclaim all the memory when the processes exits or otherwise dies.
+- Freeing Memory Repeatedly
+    - Freeing memory more than once is called the double free. The result is undefinded, it can lead to crashes.
+- Calling free() incorrectly
+    - Invalid frees happen when something other is passed than the pointer received from malloc().- Summary
+    - Tools like purify and valgrind help locating the source of memory-related roblems.
+
+14.5 Underlying OS Support
+- malloc() and free() are not system calls but rather library calls.
+    - The malloc library manages space in the own virtual address space of the process. It is built on top of some system calls which call into the OS to ask for more memory or release some.
+- brk is a system call which changes the location of the program's break: The location of the end of the heap.
+    - It takes one argument, the address of the new break and either increases or decreases the size of the heap.
+- sbrk is passed an increment.
+- brk and sbrk should never be called directly. They are used by the memory-allocation library.
+- mmap() creates an anonymous memory region within the program and is associated with swap space. The memory can be treated and managed like a heap.
+
+14.6 Other Calls
+- calloc() allocates memory and zerores it. It is initialized.
+- realloc() makes a new larger region of memory and copies the old region into it. It is useful when space was allocated but then more space was needed.
