@@ -34,3 +34,63 @@
 - Isolation is a key principle for reliable systems. If one entitiy fails, it won't affect the other when they are properly isolated.
     - OSs strive to isolated processes from each other to prevent one from harming the other. With memory isolation, it is ensured that running programs cannot affect the operatio of the OS. 
     - Using microkernels instead of typical monolithic kernel designs, some OSs take isolation even further by walling of pieces of the OS from other pieces from it.
+
+Homework
+2.
+free -m
+               total        used        free      shared  buff/cache   available
+Mem:           15458        1638       11750         329        2692       13819
+Swap:           4095           0        4095
+
+free -g            
+               total        used        free      shared  buff/cache   available
+Mem:              15           1          11           0           2          13
+Swap:              3           0           3
+
+3.
+free -g
+               total        used        free      shared  buff/cache   available
+Mem:              15           3          13           0           1          11
+Swap:              3           0           3
+
+./memory-run 2000 -1
+Allocating 2097152000 Bytes
+
+free -g
+               total        used        free      shared  buff/cache   available
+Mem:              15           3          10           0           1          11
+Swap:              3           0           3
+
+7. and 8.
+./memory-run 10 -1 
+PID: 322234
+Allocating 10485760 Bytes
+
+pmap 322234 -x 
+322234:   ./a.out 10 -1
+Address           Kbytes     RSS   Dirty Mode  Mapping
+000055d56a4d0000       4       4       0 r---- a.out                    <-- Program code
+000055d56a4d1000       4       4       0 r-x-- a.out
+000055d56a4d2000       4       4       0 r---- a.out
+000055d56a4d3000       4       4       4 r---- a.out
+000055d56a4d4000       4       4       4 rw--- a.out
+000055d5a4a0f000     132       4       4 rw---   [ anon ]
+000070d616c00000   10244   10244   10244 rw---   [ anon ]               <-- Heap (10000 kB/10 mB)
+000070d617785000      12       8       8 rw---   [ anon ]
+000070d617788000     144     144       0 r---- libc.so.6                <-- Headers/libc
+000070d6177ac000    1476     972       0 r-x-- libc.so.6
+000070d61791d000     312      96       0 r---- libc.so.6
+000070d61796b000      16      16      16 r---- libc.so.6
+000070d61796f000       8       8       8 rw--- libc.so.6
+000070d617971000      40      20      20 rw---   [ anon ]
+000070d617991000      16       0       0 r----   [ anon ]
+000070d617995000       8       4       0 r-x--   [ anon ]
+000070d617997000       4       4       0 r---- ld-linux-x86-64.so.2     <-- Headers/libc
+000070d617998000     164     160       0 r-x-- ld-linux-x86-64.so.2
+000070d6179c1000      40      40       0 r---- ld-linux-x86-64.so.2
+000070d6179cb000       8       8       8 r---- ld-linux-x86-64.so.2
+000070d6179cd000       8       8       8 rw--- ld-linux-x86-64.so.2
+00007fff10df5000     132      12      12 rw---   [ stack ]              <-- Stack
+ffffffffff600000       4       0       0 --x--   [ anon ]
+---------------- ------- ------- ------- 
+total kB           12788   11768   10336

@@ -1,7 +1,6 @@
 #include <stdio.h>
 #include <stdlib.h>
-#include <sys/resource.h>
-
+#include <unistd.h>
 
 int main(int argc, char **argv) {
     int n = 100;
@@ -18,6 +17,7 @@ int main(int argc, char **argv) {
 
     n = n * 1024 * 1024;
 
+    printf("PID: %d\n", getpid());
     printf("Allocating %d Bytes\n", n);
 
     int *buffer = malloc(n);
