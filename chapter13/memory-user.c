@@ -18,8 +18,12 @@ int main(int argc, char **argv) {
     n = n * 1024 * 1024;
 
     printf("PID: %d\n", getpid());
+
+    getchar();
+
     printf("Allocating %d Bytes\n", n);
 
+    // Speicher wird virtuell allokiert
     int *buffer = malloc(n);
 
     if (buffer == NULL) {
@@ -27,6 +31,7 @@ int main(int argc, char **argv) {
     }
 
     for (int i = 0; i < it || it < 0; ++i) {
+        // Speicher wird erst durch Nutzung physikalisch allokiert
         for (int i = 0; i < n / sizeof(int); ++i) {
             buffer[i] = i;
         }
