@@ -22,6 +22,4 @@ int main(int argc, char **argv) {
 
     ptr[0] = 2;
     ptr[1] = 3;
-
-    free(ptr);
 }
