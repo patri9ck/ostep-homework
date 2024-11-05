@@ -1,0 +1,205 @@
+17.0 Free Space Mangement
+- Free-space mangement is easy when the managed space is divided into fixed-size units.
+    - A list of fixed-size units is kept. The first entry is returned, when a client requests one of them.
+- When variable-sized units are used, managing free space which leads to a memory-allocation library (such as malloc() and free()).
+    - The OS manages physical memory using segementation.
+    - This leads to the problem of external fragmentation: The free space is divided into little pieces of different sizes.
+    |   free: 10 Bytes  |   used: 10 Bytes  |   free: 10 Bytes  |
+    - In this case, the free space is divided into chunks of 10 bytes. Even though there are 20 bytes free, a request of 15 bytes will fail.
+
+17.1 Assumptions
+- malloc() and free() are assumed which manage the heap. free() does not know the size of the chunk and therefore has to figure it out by itself.
+- The data structure used to manage free space in the heap is some kind of free list. It contains references to all free chunks.
+- The main concern is external fragmentation.
+- Internal fragmentation happens when an allocator hands out chunks of memory bigger than requested. It is called that way as the waste occurs inside the allocated unit.
+- If memory is handed out to a client, it cannot be relocated to another location in memory. No compaction is possible which would be useful to combat fragmentation.
+    - Compaction could be used by the OS when implementing segmenation.
+- The allocator managed a contiguous region of bytes. It is assumed that the regions has a fixed size.
+
+17.2 Low-level Mechanisms
+- Splitting and Coalescing
+    |   free: 10 Bytes  |   used: 10 Bytes  |   free: 10 Bytes  |
+    head -> (addr:0, len:10) -> (addr:20, len:10) -> NULL
+    - A request for anything greater than 10 bytes will fail/return NULL.
+    - A request for exactly 10 bytes will be satisfied easily.
+    - If the request is smaller than 10 bytes, the allocator will do splitting:
+        - The free chunk will be found and split into two. The first chunk will be returned to the caller and the second will remain on the list.
+        - If the request chunk has a size of 1 byte and the allocator decides to use the second element on the list, it will look like this:
+        head -> (addr:0, len:10) -> (addr:21, len:9) -> NULL
+    - When free(10) is ran with the initial example, and the free space is added back to the list without thinking, the list might end up like this:
+        head -> (addr:10, len:10) -> (addr:0, len:10) -> (addr:20, len:10) -> NULL
+        - This would lead to the problem that a 20 byte request will fail as a simple list traversal will not find a free chunk.
+        - To avoid this, free space is coalesced when a chunk of memory is freed.
+        - When a free chunk is returned, it is checked whether it sits right next to another one (or another two, as in this example) and then merged into a single larger free chunked.
+        head -> (addr:0l len:30) -> ULL
+
+- Tracking The Size Of Allocated Regions
+    - As free() does not take a size paraemeter, the malloc library has to quickly determine the size of the region of memory being freed.
+    - This is done by storing extra information in a header block, usually right before the handed-out memory chunk.
+    hptr ->
+            size: 20
+            magic: 1234567
+    ptr ->
+            |
+            |
+        20 bytes returned
+            |
+            |
+    typedef struct {
+        int size;
+        int magic;
+    } header_t;
+    - The magic number is used for an additional integrity check.
+    - When free() is called, the library can use simple pointer arithmetic.
+    void free(void *prt) {
+        header_t *hptr = (header_t *) ptr - 1;
+    }
+    - It can then determine whether the magic number matches the expected value.
+    assert(hptr->magic == 1234567)
+    - The size of the free region is the size of the header plus the size of the space allocated to the user. When N bytes are requested, the library searches for a free chunk of size N plus the size of the header.
+
+- Embedding A Free List
+    - When space for a new node in the free list is needed, malloc() cannot be called within the memory-allocation library, The list must be built inside the free space itself.
+    - The description of a node of the list can look like:
+    typedef struct __node_t {
+        int size;
+        struct __node_t *next;
+    } node_t;
+    - Assuming the free list has to manage a 4096-byte (4KB) chunk of memory and the heap is built within free space acquired via a call to the system call mmap(), the heap can be initialized like this:
+    node_t *head = mmap(NULL, 4096, PROT_READ|PROT_WRITE, MAP_ANON|MAP_PRIVATE, -1, 0);
+    head->size = 4096 - sizeof(node_t);
+    head->next = NULL;
+    - Now, there is a free chunk of 4088 bytes. This chunk is split into two (one chunk big enought to service the request and the remaining free chunk).
+        - The first chunk is chosen, the heap would look like this:
+        hptr ->
+                size: 100
+                magic: 1234567
+        ptr ->
+                |
+                |
+            100 bytes returned
+                |
+                |
+        head ->
+                size: 3980
+                next: 0
+                |
+                |
+            Remaining 3980 bytes
+                |
+                |
+        - When three allocations happen, the heap looks like this:
+                size: 100
+                magic: 1234567
+                |
+                |
+            100 bytes returned
+                |
+                |
+                size: 100
+                magic: 1234567
+                |
+                |
+            100 bytes returned
+                |
+                |
+                size: 100
+                magic: 1234567
+                |
+                |
+            100 bytes returned
+                |
+                |
+                size: 3980
+                next: 0
+                |
+                |
+            Remaining 3980 bytes
+                |
+                |
+        - When the heap starts at the virtual address 16 KB/16384 bytes, the middle chunk can be freed by calling free(16384 + 108 + 8), so by adding the start of the memory region to the size of the previous chunk plus the header of the chunk to be freed. If inserted at the head of the free list, the space now looks like:
+                size: 100
+                magic: 1234567
+                |
+                |
+            100 bytes returned
+                |
+                |
+        head ->
+                size: 100
+                next: 16708
+                |
+                |
+            Remaining 100 bytes
+                |
+                |
+                size: 100
+                magic: 1234567
+                |
+                |
+            100 bytes returned
+                |
+                |
+                size: 3980
+                next: 0
+                |
+                |
+            Remaining 3980 bytes
+                |
+                |
+        - If the other chunks are freed as well, one will end up with fragmentation. The solution is to coalesce the list: Go through it and merge neighboring chunks.
+
+- Growing The Heap
+    - If the heap runs out of space, the simplest approach is to fail and return NULL.
+    - Typically, most allocators start with a small heap and request more memory from the OS e.g. by using sbrk to grow the heap.
+        - The OS finds free physical pages, maps them into the address space of the requesting process and returns the end of the new heap.
+
+17.3 Basic Strategies
+- Best Fit
+    - Search through the free list and find chunks of free memory that are as big or bigger than the request size.
+    - Return the one that is the smallest of the candidates, the so-called best-fit chunk.
+    - By returning a block that is close to what the user asks, best fit tries to reduce wasted space.
+    - A heavy performance penalty might be paid when performing an exhaustive search for the correct free block.
+
+- Worst Fit
+    - Worst fit is the opposite of best fit: Find the largest chunk and returns the requested amount.
+    - That way, big chunks are kept free instead of lots of small chunks.
+    - As a full search is required, the approach can be costly.
+
+- First Fit
+    - The first block that is big enough is chosen and the requested amount is returned to the user.
+    - It has the advantage of speed.
+    - It can pollute the beginning of the free list with small objects. By keeping the list ordered by the address of free space, coalescing can become easier and fragmentation tends to be reduced.
+
+- Next Fit
+    - Instead of start searching at the beginning of the list, next fit keeps an extra pointer to the location where one was looking last.
+    - The goal is to spread the searches for free space throughout the list more uniformly to avoid splintering of the beginning of the list.
+    - The performance is similar to first fit.
+
+17.4 Other Approaches
+- Segregated List
+    - If an applications has one or a few popular-sized requests that it makes, a seperate list is kept to manage objects of that size.
+    - By having a chunk of memory dedicated for one particular size of requests, fragmentation becomes much less.
+    - Allocation and free requests can be served quickly as no complicated search of a list is required.
+    - How much memory should be dedicated to the memory that serves requests of a given size?
+        - The slab allocator allocates at boot a number of object caches for kernel objects that are likely to be requested frequently (e.g. locks, file-system inode).
+        - The object caches are segregated free lists of a given size.
+        - When a given cache is running low on free space, more slabs of memory are requested from a more general memory allocator.
+        - When the reference ocunts of the objects within all given slab go to zero, the general allocator can reclaim them.
+        - Free objects on the lists are kept in a pre-initialized state to lower overhead.
+
+- Buddy Allocation
+    - The binary buddy allocator is designed around making coalescing simple.
+    - Free memory is though as one big space of size 2^N.
+    - When memory is requested, the free space is recursively divided by two until a block that is big enough for the request is found.
+    - A 64 KB block getting divided in the search of a 7KB block:
+    -------------------------64KB-------------------------
+    -----------32KB-----------  -----------32KB-----------
+    ----16KB----  ----16KB----  
+    -8KB-  -8KB-
+    - As each address of each buddy pair only differs by a single bit (which bit is determined by the level in the buddy tree), it is simple to determine the buddy of a particular block.
+
+- Other Ideas
+    - A major problem with most approaches is scaling. Searching lists can be quite slow.
+    - Advanced allocators use more complex data structures to address these costs, simplicity is traded for performance (e.g. balanced binary trees, splay trees, partically-ordered trees).
+    - As modern systems often have multiple processors and run multi-threaded workloads, a lot of effor has been spent making allocators work well on multiprocessor-based systems.
