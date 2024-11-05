@@ -65,4 +65,10 @@ Ability to raise exceptions                                                     
     - When a process is created, the OS can search a data structure (often called a free list) to find room for the new address space. When two slots are free, the free list would consist of those two entries.
 - The OS must reclaim memory if a process is terminated.
     - The OS puts its memory back on the free list and cleans up any associated data structures.
-
+- The OS mut perform additional steps when a context switch occurs.
+    - As there is only one base and bounds register pair on each CPU and their values differ for each running program.
+    - The OS must save and restore the base-and-bounds pair when it switches between processes in a per-process strucutre such as the process structure or the process control block (PCB).
+- When a process is not running, it is possible for the OS to move its address space to another location.
+    - To move it, the OS first has to deschedule it, then it has to copy its address space to the new location. Finally, the OS has to update the saved base register.
+- The OS must provide exception handlers. They are installed at boot time.
+    - When a process performs a bad load, the OS can terminate it. It then has to remove its entry from the process table.
