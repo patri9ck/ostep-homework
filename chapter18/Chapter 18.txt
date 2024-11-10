@@ -1,0 +1,195 @@
+18.0 Paging: Introduction
+- The OS takes two approaches when solving most any space-mangement problem.
+    1. Chopping space up into variable-sized pieces, as seen with segmentation in virtual memory.
+        - Problem: The space itself can become fragmented.
+    2. Chopping space up into fixed-sized pieces, as seen with paging in virtual memory.
+        - Instead of splitting up a process's address space into variable-sized logical segments (e.g. code, heap and stack), it is split into fixed-size units, each of which is called a page.
+        - Physical memory is viewed as an array of fixed-sized slots called page frames. Each of them can contain a single virtual-memory page.
+
+18.1 A Simple Example And Overview
+- A simple 64-byte address space
+    0--------
+        |
+        page 0
+        |
+    16--------
+        |
+        page 1
+        |
+    32--------
+        |
+        page 2
+        |
+    48--------
+        |
+        page 3
+        |
+    64--------
+
+- A 64-byte address space in a 128-byte physical memory
+    0--------
+        |
+        reserved for OS
+        |
+    16--------
+        |
+        unused
+        |
+    32--------
+        |
+        page 3 for AS
+        |
+    48--------
+        |
+        page 0 for AS
+        |
+    64--------
+        |
+        unused
+        |
+    80--------
+        |
+        page 2 of AS
+        |
+    96--------
+        |
+        unused
+        |
+    112--------
+        |
+        page 1 of AS
+        |
+    128--------
+
+- Likely the most important improvement of paging is flexibility.
+    - The system will be able to support the abstraction of an address space effectively, regardless of how the address space is used.
+    - For example, no assumption about the direction the heap and stack grow will be made.
+
+- Another advantage is simplicity.
+    - When the OS wants to place the 64-byte address space into physical memory, it simply finds four free pages. It can keep a free list of all free pages and can just take the first four free pages off it.
+
+- To record where each virtual page of the address space is placed in physical memory, the OS keeps a per-process data structure called the page table.
+    - It stores address translations for each of the virtual pages of the address space.
+    - In this example, the page table would have the following entries:
+        (virtual page 0 -> physical frame 3), (virtual page 1 -> physical frame 7), (virtual page 2 -> physical frame 5), (virtual page 3 -> physical frame 2)
+    - Most page table structures are per-process structures, an exception is the inverted page table.
+
+- Translating a virtual address:
+    1. Split it into two components: Virtual page number (VPN) and the offset withing the page. 
+    - In this example, as the virtual address space is 64 bytes, 6 bits are needed for the virtual address (2^6 = 64):
+        |Va5|Va4|Va3|Va2|Va1|Va0|
+    
+    2. As the page size is 16 bytes and the address space is 64 bytes, we must be able to select 4 pages. The top 2 bits of the address just do that. The remaining bits tell us which byte of the page we are interested in, in this case 4 bits.
+        |  VPN  |    Offset     |
+        |Va5|Va4|Va3|Va2|Va1|Va0|
+
+    3. Example: Translating the virtual address 21. 21 in binary is 010101.
+        |  VPN  |    Offset     |
+        | 0 | 1 | 0 | 1 | 0 | 1 |
+    - The VPN is 01 in binary or 1 in decimal. The offset is 0101 in binary or 5 in decimal.
+    - The address can be translated by replacing the VPN with the physical frame number (PFN) (sometimes called physical page number/PPN).
+    - To find the correct PFN, the page table can be indexed. In this case, it is 7.
+        |  VPN  |    Offset     |
+        | 0 | 1 | 0 | 1 | 0 | 1 |
+        |       |
+        |Address|
+       Translation
+    |           |               |
+    |    PFN    |    Offset     |
+    | 1 | 1 | 1 | 0 | 1 | 0 | 1 |
+    - The final physical address is 1110101 in binary or 117 in decimal.
+    
+18.2 Where Are Page Tables Stored?
+- Page tables can become very large, much bigger than a segment table or a base/bounds pair.
+    - On a 32-bit address space with 4 KB pages, the virtual address splits into a 20-bit VPN and 12-bit offset. With a 20-bit VPN, the OS would need to manage 2^20 translations. Assuming 4 bytes are needed per page table entry (PTE), 4 MB of memory would be needed for each page table. With 100 processes running, the OS would need 400 mb of memory for all address translations.
+- As page tables are so big, there is not any special on-chip hardware in the MMU to store the page table for the currently-running process.
+- Assumption for now: The page table lives in physical memory, managed by the OS.
+- Example page table in kernel physical memory:
+    0--------
+        |
+        page frame 0: page table: 3 7 5 2
+        |
+    16--------
+        |
+        page frame 1: unused
+        |
+    32--------
+        |
+        page frame 2: page 3 for AS
+        |
+    48--------
+        |
+        page frame 3: page 0 for AS
+        |
+    64--------
+        |
+        page frame 4: unused
+        |
+    80--------
+        |
+        page frame 5: page 2 of AS
+        |
+    96--------
+        |
+        page frame 6: unused
+        |
+    112--------
+        |
+        page frame 7: page 1 of AS
+        |
+    128--------
+- Typically, there is one page table per process.
+- The exact structure is either determined by the hardware on older systems or can be more flexibly managed by the OS on modern systems.
+18.3 What's Actually In The Page Table?
+- The page table is just a structure to map virtual addresses (virtual page numbers) to physical addresses (physical frame numbers).
+- The simplest form of a page table is a linear page table which is just an array.
+    - The OS indexes the array by the virtual page number (VPN) and looks up the page table entry (PTE) at that index in order to find the physical frame number (PFN).
+
+- The PTE consists of different bits.
+    - A valid bit indicates whether a particular transition is valid.
+        - For example, when a program starts running, it will have code and heap at one end and the stack at the other of its address space. The unused space in-between will be marked as invalid. If the process tries to access it, it will generate a trap to the OS.
+        - By marking all unused pages as invalid, the need is removed to allocate physical frames for those pages. A great deal of memory is saved.
+    
+    - Protection bits indicate whether the page could be read from, written to, or executed from. Accessing a page in a way not allowed by these bits will generate a trap.
+
+    - A present bits indicates whether the page is in physical memory or on disk (swapped out).
+
+    - A dirty bit indicates that the page has been modified since it was brought into memory.
+
+    - A reference/accessed bit tracks whether a page has been accesses and is used to determine which oages are popular and should be kept in memory. It is important during page replacement.
+
+- An x86 PTE:
+    31--------12---9---8---7---6---5---4---3---2---1---0
+     |   PFN   |   | G |RAT| D | A |PCD|PWT|U/S|R/W| P |
+     
+     P = present bit
+     R/W = read/write bit, determine if writes are allowed to this page)
+     U/S = user/supervisor bit, determine if user-mode processes can access the page)
+     PWT, PCD, PAT, G = determine how hardware caching works for this page
+     A = accessed bit
+     D = dirty bit
+     PFN = page frame number
+    
+    - There is no seperate valid and present bit, only a present bit. If the bit is set (P = 1), the page is both present and valid. If not (P = 0), the page may not be present in memory (but valid) or may not be valid.
+        - An access with it unset will trigger a trap to the OS. It must then use additional structures it keeps to determine whether the page is valid (and should be swapped out) or not (so the program tries to access memory illegaly).
+        - This is common in hardware, which often just provide the minimal set of features upon which the OS can build a full service.
+
+18.4 Paging: Also Too Slow
+- Assuming the instruction movl 21, %eax and the hardware perfoming the translation, it has to:
+    - Translate the virtual address into the correct physical address (117).
+    - Fetch the proper PTE from the proccess's page table.
+    - Must know where the page table is for the currently-running process.
+        - Assuming, there is a single page-table base register that contains the physical address of the starting location of the page table, the hardware has to do perform the following function to find the desired PTE:
+        
+        VPN = (VirtualAddress & VPN_MASK) >> SHIFT
+        PTEAddr = PageTableBaseRegister + (VPN * sizeof(PTE))
+
+        - To pick out the VPN bits from the virtual address, VPN_MASK would be set to 0x30 in this case. SHIFT is set to the number of bits in the offset, 4.
+        - Once the physical address is known, the hardware can fetch the PTE from memory and extract the PFN and concatenate it with the offset.
+
+        Offset = VirtualAddress & OFFSET_MASK
+        PhysAddr = (PFN << SHIFT) | offset
+
+        - Finally, the hardware can fetch the desired data and put it into register eax.
+
+- Without careful design of both hardware and software, page tables will cause the system to run too slowly and take too much memory.
