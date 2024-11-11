@@ -1,0 +1,151 @@
+19.0 Paging: Faster Translations (TLBs)
+- Paging can lead to high performance overheads, as each memory translation requires an extra memory lookup.
+
+=> How can this be sped up and how can the extra memory reference be avoided?
+
+- The solution to this is help by the hardware using a translation-lookaside buffer (TLB) which is part of the memory-management unit (MMU).
+    - It is a simple hardware cache of popular virtual-to-physical address translations. A better name would be an address-translation cache.
+    - Upon every memory reference, the hardware checks the TLB to see if it contains the desired translation.
+    - If so, the translation is performed quickly without having to look at the page table.
+
+19.1 TLB Basic Algorithm
+    
+    VPN = (VirtualAddress & VPN_MASK) >> SHIFT
+    (Success, TlbEntry) = TLB_Lookup(VPN)
+    if (Success == True) // TLB Hit
+        if (CanAccess(TlbEntry.ProtectBits) == True)
+            Offset = VirtualAddress & OFFSET_MASK
+            PhysAddr = (TlbEntry.PFN << SHIFT) | Offset
+            Register = AccessMemory(PhysAddr)
+        else
+            RaiseException(PROTECTION_FAULT)
+    else // TLB Miss
+        PTEAddr = PTBR + (VPN * sizeof(PTE))
+        PTE = AccessMemory(PTEAddr)
+        if (PTE.Valid == False)
+            RaiseException(SEGMENTATION_FAULT)
+        else if (CanAccess(PTE.ProtectBits) == False)
+            RaiseException(PROTECTION_FAULT)
+        else
+            TLB_Insert(VPN, PTE.PFN, PTE.ProtectBits)
+            RetryInstruction()
+
+- Assumptions: A linear page table and a hardware-managed TLB.
+- If the TLB holds the translation for the VPN, it is a TLB hit. If not, it is a TLB miss.
+- The TLB is built on the premise that, in the common case, translations are found in the cache. If so, the over-head is little. If not, the high cost of paging is incurred.
+
+19.2 Example: Accessing An Array
+- The TLB improves performance due to spatial locality as the elements of an array are packed tightly into pages.
+- The page size plays a big role: Typical page sizes are around 4 KB, so dense, array-based accesses achieve excellent TLB performance.
+- If an array is accessed a second time, the result is even better because of the quick re-referencing of memory items in time which is called temporal locality.
+
+- Caching is a fundamental performance technique in computer systems.
+    - The idea behind caching is to take advantage of locality in instruction and data references.
+    - There are two types of locality: Temporal and spatial locality.
+    - Temporal locality: An instruction or data item that has been recently accesses will likely be re-accessed soon in the future.
+    - Spatial locality: If a program accesses memory at address x, it will likely soon access memory near x.
+    - Hardware caches, whether for instruction, data or address translations keep copies of memory in small, fast on-chip memory.
+    - A cache cannot keep all data as a fast cache has to be small and issues like the speed-of-light and other physical constraints become relevant. Any large cache by definition is slow.
+
+
+19.3 Who Handles The TLB Miss?
+- Either the hardware or the software (OS) can handle the TLB miss.
+
+- On old architectures, the hardware had complex instruction sets (CISC/complex instruction set computers) and would handle the TLB miss.
+    - To do so, the hardware has to know where the page tables are located via a page table register as well as their exact format.
+    - The x86 Intel architectures uses a fixed multi-level page table for example.
+
+- More modern RISC (reduced-instruction set computers) architectures have a software-managed TLB.
+    - On a TLB miss, the hardware simply raises an exception. The instruction stream is paused and the privilege level is raised to kernel mode. A trap handler will lookup the translation in the page, use privileged instructions to update the TLB and return from the trap. The hardware retries the instruction, resulting in a TLB hit.
+    - The return-from-trap must be different. When servicing a system call, the return-from-trap should resume execution at the instruction after the trap into the OS.
+    - When returning from a TLB miss-handling trap, the hardware must resume execution at the instruction that caused the trap. Therefore, the hardware must save a different PC when trapping into the OS.
+    - When running th TLB miss-handling code, the OS must be careful not to cause an infinite chain of TLB misses.
+    - One solution is to keep TLB miss handlers in physical memory where they are unmapped and not subject to address translation.
+    - Another solution is to reserve some entries in the TLB for permantently-valid translations and use some of those permanent translation slots for the handler code itself. These wired translation always hit in the TLB.
+
+- The primary advantage of the software-managed approach is flexibility as the OS can use any data structure it wants to implement the page table.
+- Another advantage is simplicity.
+
+    VPN = (VirtualAddress & VPN_MASK) >> SHIFT
+    (Success, TlbEntry) = TLB_Lookup(VPN)
+    if (Success == True) // TLB Hit
+        if (CanAccess(TlbEntry.ProtectBits) == True)
+            Offset = VirtualAddress & OFFSET_MASK
+            PhysAddr = (TlbEntry.PFN << SHIFT) | Offset
+            Register = AccessMemory(PhysAddr)
+        else
+            RaiseException(PROTECTION_FAULT)
+    else // TLB Miss
+        RaiseException(TLB_MISS)
+
+- CISC instruction sets tend to have a lot of instruction in them where each is relatively powerful. The goal is to make the assembly language itself easier to use.
+- RISC instruction sets assume that instruction sets are actually compiler targets. It is better for compilers to have a few simple primitives they can use to generate high-performance code.
+- As time progresses, CISC manufacturers incorporated many RISC techniques into the core of their processors. These innovations as well as a growing number of transistors on each chipp allowed CISC to remain competitive.
+
+19.4 TLB Contents: What's In There?
+- A typical TLB might have 32, 64 or 128 entries and be fully associate (any translation can be anywhere in the TLB and the hardware will search the entire TLB in parallel).
+- A TLB entry might look like this:
+    VPN | PFN | other bits
+    - The TLB commonly has a valid bit which indicates whether the entry has a valid translation or not.
+    - Also common are protection bits which determine how a page can be accessed (as in the page table).
+    - More bits may include an address-space identifier, a dirty bit and more.
+
+- The TLB valid bit is different from the page table valid bit.
+    - The page table valid bit indicates whether the page has been allocated by the process or not.
+    - The TLB valid bit refers to whether a TLB entry has a valid translation within it. When the system boots, for example, a common initial state for each TLB entry is to be set to invalid as no address translations are yet cached.
+
+19.5 TLB Issue: Context Switches
+- When switching from one process to another, the hardware must ensure that the about-to-be-run process does not accidentally use translation from some previously run process.
+
+- One solution is to flush the TLB on context switches by setting all valid bits to 0.
+    - On a software-based system, this can be accomplished with a privileged hardware instruction.
+    - With hardware-managed TLB, te flush could be enacted when the page-table register is changed.
+    - This can cause bigger overhead.
+
+- Some hardware systems provide an address space identifier (ASID) field in the TLB. The ASID is like a process identifier (PID) but has fewer bits (8 instead of 32).
+    - Therefore, the hardware must know which process is running. To do so, the OS must set a privileged register to the ASID of the current proccess.
+    - Sometimes, two different processes might share the same physical page, for example a code page. In binaries or shared libraries, this can reduce the number of pages in use and therefore memory overheads.
+
+19.6 Issue: Replacement Policy
+- When installing a new entry in the TLB, an old one has to be replaced. Which one?
+
+- One policy is to choose the least-recently-used (LRU) entry.
+    - It tries to take advantage of locality in the memory-reference stream, assuming that an entry that has not recently been used is a good candidate.
+
+- Another approach is to use a random policy, which chooses a random TLB mapping.
+    - It is simple and avoids corner cases. For example, a policy like LRU behaves unreasonably when a program loops over n + 1 pages with a TLB of size n. In this case, LRU misses upon every access.
+
+19.7 A Real TLB Entry
+- MIPS R4000
+    - 32 bit address space
+    - 4 KB pages
+    => Would expect 20-bit VPN, but there are only 19 bits as user addresses will only come from half the address space, the rest is reserved for the kernel
+    => 12-bit offset
+    - VPN translates up to 24-bit physical frame number, so up to 64 GB of physical main memory is supported(2^24 4 KB pages)
+
+    |          VPN          | G |         |   ASID   |
+    |   |            PFN            |  C  | D | V |  |
+
+    - G: global bit, used for pages that are globally-shared among proccesses. If it is set, the ASID is ignored.
+    - C: coherence bits, used to determine how a page is cached by the hardware
+    - D: dirty bit, marked when a page has been written to
+    - V: valid bit, to tell the hardware whether it contains a valid translation
+    - There is also a not shown page mask field which supports multiple page sizes.
+    - Some of the 64 bits are unused.
+
+    - MIPS TLBs usually have 32 or 64 of these entries. A few are reserved for the OS. How many can be set by the OS by setting a wired register.
+        - The OS uses them for code and data it wants to access during critical times where a TLB miss would be problematic (e.g. in the TLB miss handler).
+    - As the MIPS TLB is software-managed, there must be a few privileged instructions:
+        - TLBP: Probes the TLB to see if a particular translation is in there
+        - TLBR: Reads the contents of a TLB entry into registers.
+        - TLBWI: Replaces a specific TLB entry.
+        - TLBWR: Replaces a random TLB entry.
+
+19.8 Summary
+- If the number of pages a program accesses in a short period of time exceeds the number of pages that fit into the TLB, the program will generate a large number of TLB misses - it exceedes the TLB coverage.
+    - One solution is to include support for larger page sizes which increases effective coverage. 
+    - Support for large pages is often exploited by program such as a database management system (DBMS) which have certain data structures that are both large and randomly-accessed.
+
+- TLB can become a bottleneck if implemented as a physically-indexed cache.
+    - With such, address translation has to happend before the cache is accessed.
+    - The solution is a virtually-indexed cache which can be accessed with virtual addresses. It solves performance problems but introduces new issues into hardware design.
