@@ -1,0 +1,107 @@
+20.0 Paging: Smaller Tables
+- Assuming a 32-bit address space (2^32 bytes) with 4 KB pages (2^12 byte and a 4-byte page-table entry:
+    - An address space has roughly one million virtual pages in it (2^32/2^12).    - By multiplying by the page-table entry size, a page table is 4 MB size.
+    - There is one page table for every process in the system. With hundred active proccesses, hundreds of megabytes will be allocated just for page tables.
+
+=> Simple array-based page tables (linear page tables) are too big.
+
+20.1 Simple Solution: Bigger Pages
+- Assuming the same 32-bit address space again, but with 16 KB pages, a page table would have 2^18 entries and only have a size of 1 MB.
+- However, big pages lead to waste within each page, known as internal fragmentation. Thus, modern systems use relatively small page sizes such as 4 KB in x86.
+- Many architecture do support multiple page sizes.
+    - Usally, a small page size of 4 or 8 KB is used.
+    - However, if a smart application requests it, a single large page, for example of size 4 MB, can be used for a specific portion of the address space. They can place a frequently-used large data structure in there.
+    - This way, only one TLB entries is consumed.
+    - This type is common in database management systems.
+    - The purpose of supporting multiple page sizes is not to make page tables smaller, but to reduce pressure on the TLB.
+
+20.2 Hybrid Approach: Paging and Segments
+- One page table per logical segment (heap, code, stack).
+- The base register is used to hold the physical address of the page table of the segment.
+- The bounds register indicates the end of the page table.
+- To determine which segment an address, refers to, the top two bits of the address space are used, the segment bits (SN):
+    - 00: unused
+    - 01: code
+    - 10: head
+    - 11: stack
+- This way, there are three base/bounds pairs on the hardware.
+- On a context switch, these registers must be changed.
+    
+    SN = (VirtualAddress & SEG_MASK) >> SN_SHIFT
+    VPN = (VirtualAddress & VPN_MASK) >> VPN_SHIFT
+    AddressOfPTE = Base[SN] + (VPN * sizeof(PTE))
+
+- If, for example, the code segment uses its first three pages (0, 1 and 2), the code segment page table will only have three entries. The bounds register will be set to 3.
+    - Memory accesses beyond the bounds register will generate an exception.
+- Unallocated pages between the stack and the heap no longer take up space in the page table.
+
+- Segmentation requires a certain pattern of the address space and therefore decreases flexibility.
+    - If there is large sparsely-used heap, there will be a lot of page table waste.
+    - External fragmentation is caused a page tables can now be of arbitary size (in multiple of PTEs). Finding free space for them in memory is more complicated.
+
+20.3 Multi-level Page Tables
+- Another way is to get rid of all invalid regions in the page table by using a multi-level page table which turns a linear page table into a tree.
+    - Chop up the page table into page-sized units. If an entire page of page-table entries is invalid, do not allocate the page of the page table at all.
+    - To track whether a page of the page table is valid (and if valid, where it is in memory), a new structure called the page directory is used.
+
+- The page directory, in a simple two-level table, contains one entry per page of the page table. It consists of a number of page directory entries (PDE).
+    - A PDE minimally has a valid bit and a page frame number.
+    - If the PDE is valid, it means that at least one of the pages of the page table that the entry points to is valid.
+
+- The multi-level table omly allocates page-table space in proportion to the amount of address space used which makes it compact and support sparse address spaces.
+
+- As each portion of the page table fits within a page, managing memory becomes easier. The OS can simply grab the next free page when it needs to allocate or grow a page.
+
+- With a multi-level structure, a level of indirection is added through use of the page directory, which points to pieces of the page table.
+
+- The cost of multi-level tables: On a TLB miss, two loads from memory will be required. It is a time-space trade-off.
+- It also adds more complexity.
+
+- A page table of 256 entries, spread across 16 pages, the page directory will need 16 entries. So four bits are needed from the VPN for the page-directory index. The first four are chosen.
+
+    PDEAddr = PageDirBase + (PDIndex * sizeof(PDE))
+
+- The remaining bits form the VPN are used to get the page-table index to fetch the page table entry from the page of the page table pointed to by this page-directory entry.
+
+    PTEAddr = (PDE.PFN << SHIFT) + (PTIndex * sizeof(PTE))
+
+- Complexity make systems harder to understand.
+
+- If the page table directory gets too big, more than two levels are quired. The page-directory index is split into two (PD index 0 and PD index 1).
+
+    VPN = (VirtualAddress & VPN_MASK) >> SHIFT
+    (Success, TlbEntry) = TLB_Lookup(VPN)
+    if (Success == True) // TLB Hit
+        if (CanAccess(TlbEntry.ProtectBits) == True)
+            Offset = VirtualAddress & OFFSET_MASK
+            PhysAddr = (TlbEntry.PFN << SHIFT) | Offset
+            Register = AccessMemory(PhysAddr)
+        else
+            RaiseException(PROTECTION_FAULT)
+    else // TLB Miss
+        // first, get page directory entry
+        PDIndex = (VPN & PD_MASK) >> PD_SHIFT
+        PDEAddr = PDBR + (PDIndex * sizeof(PDE))
+        PDE = AccessMemory(PDEAddr)
+        if (PDE.Valid == False)
+            RaiseException(SEGMENTATION_FAULT)
+        else
+            // PDE is valid: now fetch PTE from page table
+            PTIndex = (VPN & PT_MASK) >> PT_SHIFT
+            PTEAddr = (PDE.PFN<<SHIFT) + (PTIndex*sizeof(PTE))
+            PTE = AccessMemory(PTEAddr)
+            if (PTE.Valid == False)
+                RaiseException(SEGMENTATION_FAULT)
+            else if (CanAccess(PTE.ProtectBits) == False)
+                RaiseException(PROTECTION_FAULT)
+            else
+                TLB_Insert(VPN, PTE.PFN, PTE.ProtectBits)
+                RetryInstruction()
+
+20.4 Inverted Page Tables
+- Instead of having many page tables per process, a single page table is kept that has an entry for each physical page of the system.
+- The entry stores which process is using the page and which virtaul page of that process maps to it.
+- A linear scan would be too expensive, so a hash table is often used.
+
+20.5 Swapping the Page Tables to Disk
+- So far, it was assumed that the page tables reside in kernel-owned physical memory. As they can get too big, some systems place them in kernel virtual memory, allowing the system to swap them to disk when memory pressure gets too tight.
