@@ -1,0 +1,96 @@
+21.0 Beyond Physical Memory: Mechanisms
+- To allow virtual address spaces that are bigger than physical memory, a memory hierarchy is required.
+
+- The hard disk drive is used by the OS to stash away portions of address spaces that are not used currently.
+
+- Supporting a single large address space for a process brings more convenience and ease of use.
+    - The programmer does not have to worry whether there is enough space which is a powerful illusion.
+
+- In older systems, memory overlays required programmers to manually move pieces of code or data in and out of memory as they were needed.
+
+21.1 Swap Space
+- Swap space is the space reserved on the disk for moving pages back and forth.
+    - Assumption: The OS can read and write from the swap space in page-sized units.
+
+- The OS needs to remember the disk address of a given page.
+
+- When running a program binary, it is initially found on disk and then loaded into memory. This means that swap space is not the only on-disk location for swapping traffic.
+
+21.2 The Present Bit
+- If the present bit in the PTE is set to one, a page is in physical memory.
+- If set to zero, it is on disk somewhere. Accessing a page that is not in physical memory is called a page fault.
+    - The OS is invoked and runs the page-fault handler then.
+    - A better name would be page miss.
+
+- A page fault can also refer to illegal memory accesses.
+
+- When a program is "page faulting", it usally means it is accessing parts of its virtual address space that the OS has swapped out to disk.
+
+21.3 The Page Fault
+- If a page is not present, the OS is responsible for handling the page fault, no matter whether the TLB miss is handled by hardware or software.
+
+- The disk location of the page can be found in the page table on many systems.
+    - The OS could use the bits normally used for data such as the PFN of the page for a disk address.
+
+- The OS issues the request to disk to fetch the page into memory.
+    - Upon I/O completion, the OS will update the page table and mark the page as present.
+    - The PFN field of the corresponding PTE is also updated to the in-memory location of the newly-fetched page.
+    - Then the instruction is retried which could generate a TLB miss again. To avoid this, one could update the TLB on a page fault.
+
+- During the I/O to fetch the page, the process will be in the blocked state.
+
+21.4 What If Memory Is Full?
+- If the memory is full, the OS might first page out one or more pages to make room for the new ones.
+- The process of picking a page to kick out or replace is known as the page-replacement policy.
+
+21.5 Page Fault Control Flow
+- Hardware:
+    VPN = (VirtualAddress & VPN_MASK) >> SHIFT
+    (Success, TlbEntry) = TLB_Lookup(VPN)
+    if (Success == True) // TLB Hit
+        if (CanAccess(TlbEntry.ProtectBits) == True)
+            Offset = VirtualAddress & OFFSET_MASK
+            PhysAddr = (TlbEntry.PFN << SHIFT) | Offset
+            Register = AccessMemory(PhysAddr)
+        else
+            RaiseException(PROTECTION_FAULT)
+    else // TLB Miss
+        PTEAddr = PTBR + (VPN * sizeof(PTE))
+        PTE = AccessMemory(PTEAddr)
+        if (PTE.Valid == False)
+            RaiseException(SEGMENTATION_FAULT)
+        else
+            if (CanAccess(PTE.ProtectBits) == False)
+                RaiseException(PROTECTION_FAULT)
+            else if (PTE.Present == True)
+                // assuming hardware-managed TLB
+                TLB_Insert(VPN, PTE.PFN, PTE.ProtectBits)
+                RetryInstruction()
+            else if (PTE.Present == False)
+                RaiseException(PAGE_FAULT)
+
+- Software:
+    PFN = FindFreePhysicalPage()
+    if (PFN == -1) // no free page found
+        PFN = EvictPage() // replacement algorithm
+    DiskRead(PTE.DiskAddr, PFN) // sleep (wait for I/O)
+    PTE.present = True // update page table:
+    PTE.PFN = PFN // (present/translation)
+    RetryInstruction() // retry instruction
+
+21.6 When Replacements Really Occur
+- Starting to replace when memory is entirely full is unrealistic. There are many reasons for the OS to keep a small portion of memory free more poractively.
+
+- To do so, most OSs have a high watermark (HW) and low watermark (LW) to help to decide when to start evicting pages from memory.
+    - When the OS notices that there are fewer than LW pages available, a background thread evicts pages until there are HW pages available.
+    
+    - This thread is sometimes called the swap daemon or page daemon.
+    
+    - By performing a number of replacements at once, new performance optimizations become possible.
+        - For example, many systems cluster or group a number of pages and write them out at once to the swap partition, thus increasing the efficiency of the disk.
+
+    - The control flow should be modified: Instead of performing a replacement directly, the algorithm would check if there are any free pages available.
+        - If not, it would inform the background paging thread that free pages are needed. After it freed up some pages, it would re-awaken the original thread which could then page in the desired page.
+
+21.7 Summary
+- These actions all take place transparently to the process.
