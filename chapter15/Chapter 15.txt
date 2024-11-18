@@ -72,3 +72,7 @@ Ability to raise exceptions                                                     
     - To move it, the OS first has to deschedule it, then it has to copy its address space to the new location. Finally, the OS has to update the saved base register.
 - The OS must provide exception handlers. They are installed at boot time.
     - When a process performs a bad load, the OS can terminate it. It then has to remove its entry from the process table.
+
+Homework
+
+5. Valid Fraction = f(Bounds) = min(Bounds/Address Space Size)

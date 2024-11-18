@@ -203,3 +203,27 @@
     - A major problem with most approaches is scaling. Searching lists can be quite slow.
     - Advanced allocators use more complex data structures to address these costs, simplicity is traded for performance (e.g. balanced binary trees, splay trees, partically-ordered trees).
     - As modern systems often have multiple processors and run multi-threaded workloads, a lot of effor has been spent making allocators work well on multiprocessor-based systems.
+
+Homework
+1.
+
+./malloc.py -n 10 -H 0 -p BEST -s 0
+
+ptr[0] = Alloc(3)
+List = [1003, 97]
+
+Free(ptr[0])
+List = [1000, 3][1003, 97]
+
+ptr[1] = Alloc(5)
+List = [1000, 3][1008, 92]
+
+Free(ptr[1]
+List = [1000, 3][1003, 5][1008, 92]
+
+ptr[2] = Alloc(8)
+List = [1000, 3][1003, 5][1016, 84]
+
+free(ptr[2])
+List = [1000, 3][1003, 5][1008, 8][1016, 84]
+
