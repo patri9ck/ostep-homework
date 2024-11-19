@@ -1,0 +1,68 @@
+B.1 Introduction
+- A virtual machine monitor (VMM)/hypervisor sits between one or more operating systems and the hardware and gives the illusion to each running OS that it controls the machine.
+    - Behind the scenes, the monitor actually is in control of the hardware and must multiplex running OSs across the physical resources of the machine.
+    - The VMM serves as an OS for OSs, but at much lower level.
+    - The OSs must still think it is interacting with physical, so a major goal of VMMs is transparency.
+
+B.2 Motivation: Why VMMs?
+- People run services on different machines which run different operating systems or even OS versions with each machine being lightly utilized.
+    - In this case, virtualization enables an administrator to consolidate multiple OSs onto fewer hardware platform and lower costs and ease administration that way.
+
+- Virtualization also became popular on desktops as many users wish to run one operating system but still have access to native applications on a different platform.
+    - That way, functionality is improved.
+
+- Using VMMs, developers can test and debug on many different platform while writing code on one main platform.
+
+B.3 Virtualizing the CPU
+- To run a virtual machine (e.g. an OS and its applications) on top of a VMM, limited direct execution is used.
+    - Similar to an OS switching between running process using a context switch, a VMM must perform a machine switch to switch between running virtual machines.
+    - When performing such a switch, the VMM must save the entire machine state of one VM and restore the machine state of the to-be-run VM.
+
+- The VMM must intercept attempts to perform privileged operations as VMs should not control the machine, but rather the VMM beneath it.
+    
+- On a system call, it is the VMM that will first get executed in kernel mode as it has installed a trap handler.
+    - The VMM does not really know how to handle the call as it does not know the details of each OS.
+    - But what it knows is where the OS's trap hander is. When the OS booted up, it tried to install its own trap handlers. It was trying to some privileged and trapped into the VMM. The VMM recorded the necessary information.
+    - When the VMM receives a trap from a user process running on the given OS, it jumps to the OS#s trap handler and lets the OS handle the sytem call as it should.
+    - The return-from-trap instruction from the OS once again jumps back to the VMM which then realizes that the OS is trying to return from trap and thus perform a real return-from-trap.
+
+- The OS does not run in kernel mode as that would give it unrestricted access to the hardware.
+    - MIPS has a supervisor mode for this which gives the OS a little memory for its data structures.
+    - On hardware that does not have such mode, the OS has to run in user mode and memory protection (page tables and TLBs) to protect OS data structures must be used.
+    - When switching back to the running application, the ability to read and write the kernel must be removed that way.
+    
+    Process             Operating System    VMM
+
+    1. System call:
+    Trap to OS
+                                            2. Process trapped:
+                                            Call OS trap handler
+                                            (at reduced privilege)
+                        3. OS trap handler:
+                        Decode trap and
+                        execute syscall;
+                        When done: issue
+                        return-from-trap
+                                            4. OS tried return from trap:
+                                            Do real return from trap
+    5. Resume execution
+    (@PC after trap)
+
+B.4 Virtualizing Memory
+- The extra layer of virtualization makes physical memory (which consists of physical frames) a virtualization on top of the real physical memory of the system, the machine memory (which consists of machine frames).
+    - The OS maps virtual-to-physicl addresses, the VMM maps the resulting physical mappings to machine addresses via its per OS page-tables.
+
+- When a process misses in the TLB, not the OS TLB miss handler will run but rather the VMM TLB miss handler.
+    - As the VMM TLB miss handler does not know how to handle the miss, it will jump to the OS TLB miss handler.
+    - When the OS tries to install the VPN-to-PFN mapping in the TLB, it will cause another trap into the VMM as the OS is not privileged.
+    - At this point, the VMM, instead of it installing the VPN-to-PFN mapping to the TLB, it will install the VPN-to-MFN mapping.
+    - The OS then gets back to the user-level code which retries and results in a TLB hit.
+
+- To reduce the cost, a VMM can have a software TLB which records every virtual-to-physical mapping that it sees the OS try to install.
+    - On a TLB miss, the VMM checks its software TLB to see if it contains the virtual-to-machine mapping and what it should be.
+    - If the software TLB contains it, the VMM will install the virtual-to-machine mapping directly to hardware TLB.
+
+- With a hardware-managed TLB, the hardware walks the page table on each TLB miss and updates the TLB as need be. The VMM does not have a chance to run on each TLB miss.
+    - The VMM must closely monitor changes the OS makes to each page table (which is pointed to by a page-table base register) and keep a shadow page table that maps virtual addresses to machine pages.
+    - A process's shadow page table is installed whenever the OS tries to install the process's OS-level page table. This way, the hardware uses the shadow page table without the OS noticing.
+
