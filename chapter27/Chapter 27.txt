@@ -1,0 +1,196 @@
+27.1 Thread Creation
+    #include <pthread.h>
+    
+    int pthread_create( pthread_t *thread,
+                        const pthread_attr_t *attr,
+                        void *(*start_routine)(void*),
+                        void *arg);
+
+- Example:
+    #include <stdio.h>
+    #include <pthread.h>
+
+    typedef struct {
+        int a;
+        int b;
+    } myarg_t;
+
+    void *mythread(void *arg) {
+        myarg_t *args = (myarg_t *) arg;
+        printf("%d %d\n", args->a, args->b);
+        return NULL;
+    }
+
+    int main(int argc, char *argv[]) {
+        pthread_t p;
+        myarg_t args = { 10, 20 };
+
+        int rc = pthread_create(&p, NULL, mythread, &args);
+        ...
+    }
+
+- attr can be used to specify any attributes the thread might have like setting the stack size or the scheduling priority of the thread:
+    #include <err.h>
+    #include <errno.h>
+    #include <pthread.h>
+    #include <stdio.h>
+    #include <stdlib.h>
+    #include <unistd.h>
+
+    int main(int argc, char *argv[]) {
+        pthread_t thr;
+        pthread_attr_t attr;
+        pthread_attr_t *attrp;      /* NULL or &attr */
+        int s;
+
+        attrp = NULL;
+
+        /* If a command-line argument was supplied, use it to set the
+            stack-size attribute and set a few other thread attributes,
+            and set attrp pointing to thread attributes object. */
+
+        if (argc > 1) {
+            size_t stack_size;
+            void *sp;
+
+            attrp = &attr;
+
+            s = pthread_attr_init(&attr);
+            if (s != 0)
+                errc(EXIT_FAILURE, s, "pthread_attr_init");
+
+            s = pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_DETACHED);
+            if (s != 0)
+                errc(EXIT_FAILURE, s, "pthread_attr_setdetachstate");
+
+            s = pthread_attr_setinheritsched(&attr, PTHREAD_EXPLICIT_SCHED);
+            if (s != 0)
+                errc(EXIT_FAILURE, s, "pthread_attr_setinheritsched");
+
+            stack_size = strtoul(argv[1], NULL, 0);
+
+            s = posix_memalign(&sp, sysconf(_SC_PAGESIZE), stack_size);
+            if (s != 0)
+                errc(EXIT_FAILURE, s, "posix_memalign");
+
+            printf("posix_memalign() allocated at %p\n", sp);
+
+            s = pthread_attr_setstack(&attr, sp, stack_size);
+            if (s != 0)
+                errc(EXIT_FAILURE, s, "pthread_attr_setstack");
+           }
+
+        s = pthread_create(&thr, attrp, &thread_start, NULL);
+        if (s != 0)
+            errc(EXIT_FAILURE, s, "pthread_create");
+
+        if (attrp != NULL) {
+            s = pthread_attr_destroy(attrp);
+            if (s != 0)
+                errc(EXIT_FAILURE, s, "pthread_attr_destroy");
+        }
+
+        pause();    /* Terminates when other thread calls exit() */
+    }
+
+27.2 Thread Completion
+    
+int pthread_join(pthread_t thread, void **value_ptr);
+
+- The second argument is a pointer to the expected return value.
+
+- Example:
+    typedef struct { int a; int b; } myarg_t;
+    typedef struct { int x; int y; } myret_t;
+
+    void *mythread(void *arg) {
+        myret_t *rvals = Malloc(sizeof(myret_t));
+        rvals->x = 1;
+        rvals->y = 2;
+        return (void *) rvals;
+    }
+
+    int main(int argc, char *argv[]) {
+        pthread_t p;
+        myret_t *rvals;
+        myarg_t args = { 10, 20 };
+        Pthread_create(&p, NULL, mythread, &args);
+        Pthread_join(p, (void **) &rvals);
+        printf("returned %d %d\n", rvals->x, rvals->y);
+        free(rvals);
+        return 0;
+    }
+
+- If a single value is passed to a thread like a long long it, it does not need to be packaged up as an argument:
+    void *mythread(void *arg) {
+        long long int value = (long long int) arg;
+        printf("%lld\n", value);
+        return (void *) (value + 1);
+    }
+    
+    int main(int argc, char *argv[]) {
+        pthread_t p;
+        long long int rvalue;
+        Pthread_create(&p, NULL, mythread, (void *) 100);
+        Pthread_join(p, (void **) &rvalue);
+        printf("returned %lld\n", rvalue);
+        return 0;
+    }
+
+- Never return a pointer which refers to something allocated on the thread's call stack. When returning, the vlaue is automatically deallocated:
+    void *mythread(void *arg) {
+        myarg_t *args = (myarg_t *) arg;
+        printf("%d %d\n", args->a, args->b);
+        myret_t oops; // ALLOCATED ON STACK: BAD!
+        oops.x = 1;
+        oops.y = 2;
+        return (void *) &oops;
+    }
+
+27.3 Locks
+
+    int pthread_mutex_lock(pthread_mutex_t *mutex);
+    int pthread_mutex_unlock(pthread_mutex_t *mutex);
+
+- Locks are used to protect critical sections:
+    pthread_mutex_t lock;
+    pthread_mutex_lock(&lock);
+    x = x + 1; // or whatever your critical section is
+    pthread_mutex_unlock(&lock);
+    
+    - This code is broken in two important ways:
+        1. The lock is not initialized properly. There are to ways to intialize locks:
+            1.1. pthread_mutex_t lock = PTHREAD_MUTEX_INITIALIZER;
+            1.2. The dynamic way:
+                int rc = pthread_mutex_init(&lock, NULL);
+                assert(rc == 0); // always check success!
+
+                - The second argument is an optional set of arguments.
+            - Usually, the second method is used.
+
+        2. The code does not check error codes when calling lock and unlock.
+
+        - To keep the code clean, wrappers can be used:
+            void Pthread_mutex_lock(pthread_mutex_t *mutex) {
+                int rc = pthread_mutex_lock(mutex);
+                assert(rc == 0);
+            }
+
+- The corresponding call to pthread_mutex_destroy() should also be made when done with the lock.
+
+- Other routines:
+    int pthread_mutex_trylock(pthread_mutex_t *mutex);
+
+    - Returns failure if the lock is already held.
+
+    int pthread_mutex_timedlock(pthread_mutex_t *mutex, struct timespec *abs_timeout);
+
+    - Returns after a timeout or after acquiring the lock. With a timeout set to zero, it degenerates to the trylock routine.
+
+    - Both routines should be avoided in general.
+
+27.4 Condition Variables
+
+
+
+    

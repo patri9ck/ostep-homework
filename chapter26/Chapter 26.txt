@@ -1,0 +1,115 @@
+26.0 Concurrency: An Introduction
+- A multi-threaded program has more than one point of execution. It has multiple PCs, each of which is being fetched and executed from.
+
+- Each thread is very much like a separate process, except them sharing the same address space and thus them being able to access the same data.
+
+- Each thread has its own private set of registers, meaning that if there are two threads running on a single processor, when switching from one to the other, a context switch must take place.
+    - With processes, the state was saved to a process control block (PCB). With threads, one or more thread control blocks (TCBs) are needed.
+    - As the address space stays same, there is no need to switch which page table being used.
+
+- Instead of a single stack in the address space, there will be one per thread.
+    - The stack is a thread-local storage.
+
+26.1 Why Use Threads?
+- Parallelism
+    - Example: When performing operations on big arrays (e.g. incrementing each value of the array by some amount), the processes can be sped up by using multiple processors for a portion of the work.
+    - Transforming a single-threaded program into a program that does work on multiple CPUs is called parallelization.
+
+- To avoid blocking program progress due to slow I/O.
+    - Threading enables overlap of I/O with other activites within a single program.
+
+- Instead of multiple processes, threads are used, as they share the same address space which makes it easier to share data.
+- Processes are a more sound choice for logically separate tasks where little sharing od data structures is needed.
+
+26.2 An Example: Thread Creation
+    #include <stdio.h>
+    #include <assert.h>
+    #include <pthread.h>
+    #include "common.h"
+    #include "common_threads.h"
+
+    void *mythread(void *arg) {
+        printf("%s\n", (char *) arg);
+        return NULL;
+    }
+
+    int main(int argc, char *argv[]) {
+        pthread_t p1, p2;
+        int rc;
+        printf("main: begin\n");
+        Pthread_create(&p1, NULL, mythread, "A");
+        Pthread_create(&p2, NULL, mythread, "B");
+        // join waits for the threads to finish
+        Pthread_join(p1, NULL);
+        Pthread_join(p2, NULL);
+        printf("main: end\n");
+        return 0;
+    }
+
+- There are multiple possible execution orderings of this program depending on which thread the scheduler decides to run at a given point.
+
+26.3 Why It Gets Worse: Shared Data
+- When two threads update a global shared variable, the results are not always the same.
+
+- A disassembler shows that assembly instructions make up the program, e.g. "objdump -d main" on Linux.
+
+26.4 The Heart Of The Problem: Uncontrolled Scheduling
+- To add a number to a shared global variable, the code sequence for doing so might look like this in x86:
+    mov 0x8049a1c, %eax
+    add $0x1, %eax
+    mov %eax, 0x8049a1c
+
+    - The first instruction is to load the variable from the address 0x8049a1c into the register eax.
+    - The second instruction performs the add, adding 1 to the contents of the eax register.
+    - The third instruction stores the contents of eax back into memory at the same address.
+
+- When two threads now update the same shared global variable, the execution trace might look like this which explains the problem:
+    OS              Thread 1                Thread 2                PC  eax counter
+                    before critical section                         100 0   50
+                    mov 8049a1c,%eax                                105 50  50
+                    add $0x1,%eax                                   108 51  50
+    interrupt
+        save T1
+        restore T2                                                  100 0   50
+                                            mov 8049a1c,%eax        105 50  50
+                                            add $0x1,%ea            108 51  50
+                                            mov %eax,8049a1c        113 51  51
+    interrupt
+        save T2
+        restore T1                                                  108 51  51
+                    mov %eax,8049a1c                                113 51  51
+
+
+- Race condition (or specifically, a data race): The results depend on the timing of the code's execution. The result is indeterminate instead of determinstic.
+- Critical section: A piece of code that accesses a shared variable/shared resource and must not be concurrently executed by more than one thread.
+- Mutual exclusion: If one thread is executin within the critical section, the others will be prevented from doing so.
+
+26.5 The Wish For Atomicity
+- One solution would be to have more powerful instruction, for example one instruction to add a value to a memory location that is guaranteed to be executed atomically by the hardware.
+    - It could not be interrupted mid-instruction.
+    - This would lead to an insane instruction set, for example if there was also an instruction to support an "atomic update of a B-tree".
+
+- Atomatically, in this context, means "as a unit" (all or none).
+    - For example, to execute the three instruction sequence atomically:
+        mov 0x8049a1c, %eax
+        add $0x1, %eaxshare
+        mov %eax, 0x8049a1c
+    - For this, the hardware has to provide a few instruction to build a general set of synchronization primitives.
+    - This way, with help from the operating system, multi-threaded code can be built that accesses critical sections in a synchronized and controlled manner.
+
+26.6 One More Problem: Waiting For Another
+- Another common interaction that arises is where one thread must wait for another to complete some action before it continues.
+    - For example, when a process performs a disk I/O and is put to sleep, the process needs to be roused from its slumber when the I/O completes so it can continue.
+
+- Not only support for synchronization primitives to support atomicity, but also for mechanisms to support this type of sleeping/waking interaction is needed.
+
+26.7 Summary: Why in OS Class?
+- History: The OS was the first concurrent program, many techniques were created for use within the OS.
+    - Later, with multi-threaded processes, application programmers also had to consider the same things.
+
+- Example: Assuming two processes call write() to append data to the same file.
+    - To do so, both must allocate a new block, record the inode of the file where this block lives, change the size of the file to reflect the new larger size and more.
+    - As an interrupt can occur at any time, the code that updates these shared structures are critical sections.
+    - Page tables, process lists, file system structures and virtually every kernel data structure has to be carefully accessed with the proper synchronization primitives.
+
+

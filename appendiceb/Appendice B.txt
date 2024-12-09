@@ -66,3 +66,18 @@ B.4 Virtualizing Memory
     - The VMM must closely monitor changes the OS makes to each page table (which is pointed to by a page-table base register) and keep a shadow page table that maps virtual addresses to machine pages.
     - A process's shadow page table is installed whenever the OS tries to install the process's OS-level page table. This way, the hardware uses the shadow page table without the OS noticing.
 
+- It is good to assume that the OS cannot be modified in order to work better with VMMs.
+- However, when the OS can be modified, it may run more efficiently on top of a VMM. This is called para-virtualization, as the virtualization provided by the VMM isn't a complete one.
+- A properly-designed para-virtualized system, with just the right OS changes, can be made to be nearly as efficient as a system without a VMM.
+
+B.5 The Information Gap
+- The VMM does not know too much about what the OS is doing or wanting which is called the information gap between the VMM and the OS. It can lead to inefficiens.
+
+- If an OS has nothing to do, it might enter an idle loop just spinning and waiting for the next interrupt to occur:
+    
+    while (1)
+        ;
+    
+    - It would be useful for the VMM to know that so it can run another OS usefully running user processes.
+
+
