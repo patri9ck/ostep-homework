@@ -1,0 +1,232 @@
+29.0 Lock-based Concurrent Data Structures
+- Adding locks to a data structure to make it usable by threads makes the structure thread safe.
+
+29.1 Concurrent Counters
+- A Counter Without Locks
+
+	typedef struct __counter_t {
+	    int value;
+	} counter_t;
+
+	void init(counter_t *c) {
+	    c->value = 0;
+	}
+
+	void increment(counter_t *c) {
+	    c->value++;
+	}
+
+	void decrement(counter_t *c) {
+	    c->value--;
+	}
+
+	int get(counter_t *c) {
+	    return c->value;
+	}
+
+- A Counter With Locks
+
+	typedef struct __counter_t {
+	    int value;
+	    pthread_mutex_t lock;
+	} counter_t;
+
+	void init(counter_t *c) {
+	    c->value = 0;
+	    pthread_mutex_init(&c->lock, NULL);
+	}
+
+	void increment(counter_t *c) {
+	    pthread_mutex_lock(&c->lock);
+	    c->value++;
+	    pthread_mutex_unlock(&c->lock);
+	}
+
+	void decrement(counter_t *c) {
+	    pthread_mutex_lock(&c->lock);
+	    c->value--;
+	    pthread_mutex_unlock(&c->lock);
+	}
+
+	int get(counter_t *c) {
+	    pthread_mutex_lock(&c->lock);
+	    int rc = c->value;
+	    pthread_mutex_unlock(&c->lock);
+	    return rc;
+	}
+
+    - This is similar to a data structure built with monitors, where locks are acquired and releases automatically as you call and return from object methods.
+
+- Approximate Counter Implementation:
+
+	typedef struct __counter_t {
+	    int global; // global count
+	    pthread_mutex_t glock; // global lock
+	    int local[NUMCPUS]; // per-CPU count
+	    pthread_mutex_t llock[NUMCPUS]; // ... and locks
+	    int threshold; // update freq
+	} counter_t;
+
+	// init: record threshold, init locks, init values
+	// of all local counts and global count
+	void init(counter_t *c, int threshold) {
+	    c->threshold = threshold;
+	    c->global = 0;
+	    pthread_mutex_init(&c->glock, NULL);
+	    int i;
+	    for (i = 0; i < NUMCPUS; i++) {
+	        c->local[i] = 0;
+	        pthread_mutex_init(&c->llock[i], NULL);
+	    }
+	}
+
+	// update: usually, just grab local lock and update
+	// local amount; once it has risen ’threshold’,
+	// grab global lock and transfer local values to it
+	void update(counter_t *c, int threadID, int amt) {
+	    int cpu = threadID % NUMCPUS;
+	    pthread_mutex_lock(&c->llock[cpu]);
+	    c->local[cpu] += amt;
+	    if (c->local[cpu] >= c->threshold) {
+	        // transfer to global (assumes amt>0)
+	        pthread_mutex_lock(&c->glock);
+	        c->global += c->local[cpu];
+	        pthread_mutex_unlock(&c->glock);
+	        c->local[cpu] = 0;
+	    }
+	    pthread_mutex_unlock(&c->llock[cpu]);
+	}
+
+	// get: just return global amount (approximate)
+	int get(counter_t *c) {
+	    pthread_mutex_lock(&c->glock);
+	    int val = c->global;
+	    pthread_mutex_unlock(&c->glock);
+	    return val; // only approximate!
+	}
+
+29.2 Concurrent Linked Lists
+- Concurrent Linked List
+
+	void List_Init(list_t *L) {
+	    L->head = NULL;
+	    pthread_mutex_init(&L->lock, NULL);
+	}
+
+	int List_Insert(list_t *L, int key) {
+	    // synchronization not needed
+	    node_t *new = malloc(sizeof(node_t));
+	    if (new == NULL) {
+	        perror("malloc");
+	        return -1;
+	    }
+	    new->key = key;
+	    // just lock critical section
+	    pthread_mutex_lock(&L->lock);
+	    new->next = L->head;
+	    L->head = new;
+	    pthread_mutex_unlock(&L->lock);
+	    return 0; // success
+	}
+
+	int List_Lookup(list_t *L, int key) {
+	    int rv = -1;
+	    pthread_mutex_lock(&L->lock);
+	    node_t *curr = L->head;
+	    while (curr) {
+	        if (curr->key == key) {
+	            rv = 0;
+	            break;
+	        }
+	        curr = curr->next;
+	    }
+	    pthread_mutex_unlock(&L->lock);
+	    return rv; // now both success and failure
+	}
+
+- To enable more concurrency within a list, hand-over-hand locking/lock coupling can be used.
+    - Instead of having a single lock for the entire list, a lock per node of the list is instead added.
+    - When traversing the list, the code first grabs the next node's lock and then releases the current node's lock.
+
+- In practice, it is hard to make such a structure faster than the simple single lock approach, as the overheads of acquiring and releasing locks is prohibitve - even with very large lists.
+    - A hybrid approach where a new locked is only grabbed every so many nodes would be worth investigating.
+
+29.3 Concurrent Queues
+- Michael and Scott Concurrent Queue
+
+	typedef struct __node_t {
+	    int value;
+	    struct __node_t *next;
+	} node_t;
+
+	typedef struct __queue_t {
+	    node_t *head;
+	    node_t *tail;
+	    pthread_mutex_t head_lock, tail_lock;
+	} queue_t;
+
+	void Queue_Init(queue_t *q) {
+	    node_t *tmp = malloc(sizeof(node_t));
+	    tmp->next = NULL;
+	    q->head = q->tail = tmp;
+	    pthread_mutex_init(&q->head_lock, NULL);
+	    pthread_mutex_init(&q->tail_lock, NULL);
+	}
+
+	void Queue_Enqueue(queue_t *q, int value) {
+	    node_t *tmp = malloc(sizeof(node_t));
+	    assert(tmp != NULL);
+	    tmp->value = value;
+	    tmp->next = NULL;
+
+	    pthread_mutex_lock(&q->tail_lock);
+	    q->tail->next = tmp;
+	    q->tail = tmp;
+	    pthread_mutex_unlock(&q->tail_lock);
+	}
+
+	int Queue_Dequeue(queue_t *q, int *value) {
+	    pthread_mutex_lock(&q->head_lock);
+	    node_t *tmp = q->head;
+	    node_t *new_head = tmp->next;
+	    if (new_head == NULL) {
+	        pthread_mutex_unlock(&q->head_lock);
+	        return -1; // queue was empty
+	    }
+	    *value = new_head->value;
+	    q->head = new_head;
+	    pthread_mutex_unlock(&q->head_lock);
+	    free(tmp);
+	    return 0;
+	}
+
+29.4 Concurrent Hash Table
+- A Conccurent Hash Table
+	#define BUCKETS (101)
+
+	typedef struct __hash_t {
+	    list_t lists[BUCKETS];
+	} hash_t;
+
+	void Hash_Init(hash_t *H) {
+	    int i;
+	    for (i = 0; i < BUCKETS; i++)
+	        List_Init(&H->lists[i]);
+	}
+
+	int Hash_Insert(hash_t *H, int key) {
+	    return List_Insert(&H->lists[key % BUCKETS], key);
+	}
+
+	int Hash_Lookup(hash_t *H, int key) {
+	    return List_Lookup(&H->lists[key % BUCKETS], key);
+	}
+
+    - It is missing resizing.
+    - It has a very good performance as instead of having a single lock for the entire structure, it uses a lock per hash bucket.
+
+29.5 Summary
+- Performance problems should only be remedied once they exist. Premature optimization should be avoided. There is no value in making something faster if doing so will not improve the overall performance of the application (Knuth's law).- Many operating systems utilized a single lock when first transitioning to multiprocessors including Sun OS and Linux.
+    - In Linux, the lock had the name big kernel lock (BKL).
+    - When multi-CPU systems became the norm, the one lock was replace with many.
+    - Within Sun, a new operating system, known as Solaris, was built, that incorporates concurrency more fundamentally.
